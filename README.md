@@ -2,11 +2,13 @@
 
 Backend do agente de SDR via WhatsApp da SouClinic. Ver `../SPEC-IA-SDR.md` pra contexto completo do projeto (decisões, pendências, dados da clínica).
 
+Repo: `github.com/drypmoretti-pixel/souclinic-ia-sdr` (privado).
+
 ## Setup
 
 ```bash
 npm install
-cp .env.example .env   # preencher ANTHROPIC_API_KEY, VOYAGE_API_KEY, credenciais do Google Calendar
+cp .env.example .env   # preencher OPENAI_API_KEY, credenciais do Google Calendar
 npm run ingest          # popula a base de conhecimento (clinic_documents) no Supabase
 ```
 
@@ -21,12 +23,19 @@ npm run chat -- +5561999999999 "Nome do lead"   # CLI de teste local, sem WhatsA
 
 ## Dashboard (`/admin`)
 
-Depois de `npm run dev`, acesse `http://localhost:3000/admin` e entre com a senha do `ADMIN_TOKEN` (já tem um valor gerado no `.env`, pode trocar). Três abas: visão geral (métricas), conversas (inbox) e prompt da IA (editável, salva na tabela `agent_settings`). Compartilhe a URL + senha com o cliente quando estiver em produção.
+Depois de rodar, acesse `/admin` e entre com a senha do `ADMIN_TOKEN`. Duas abas: visão geral (métricas) e conversas (inbox). Não tem edição de prompt por ali de propósito — o prompt é fixo em `src/agent/systemPrompt.ts`, ajustado direto no código.
 
-> **Nota (2026-08-12):** não consegui validar `npm run dev` rodando de ponta a ponta nessa sessão — a máquina estava com pouquíssima memória livre e tanto `tsc` quanto `tsx` ficaram travando. O código passou no primeiro type-check limpo antes disso, mas vale rodar `npm run dev` numa hora com mais memória livre antes de confiar que está tudo certo.
+## Deploy
+
+Rodando em produção na VPS StayCloud (`srv5224724.stayx.cloud`, IP `136.0.53.133`), via `pm2` (processo `souclinic-sdr`). Pra atualizar depois de um push:
+
+```bash
+ssh root@136.0.53.133
+cd /opt/souclinic-ia-sdr && git pull && npm install && npm run build && pm2 restart souclinic-sdr
+```
+
+**Atenção**: essa VPS tem só 4GB de RAM e já roda o n8n nela — fica apertado. Se ficar instável, considerar upgrade de plano ou mover pra uma VPS separada.
 
 ## Pendências pra produção
 - `GOOGLE_CLIENT_EMAIL` / `GOOGLE_PRIVATE_KEY` / `GOOGLE_CALENDAR_ID`: credenciais do Google Calendar de teste do Igor.
-- `EVOLUTION_API_URL` / `EVOLUTION_API_KEY` / `EVOLUTION_INSTANCE`: instância WhatsApp, criada quando o Igor decidir.
-- `VOYAGE_API_KEY`: embeddings pra base de conhecimento (RAG).
-- Framework comercial (seção do prompt em `src/agent/systemPrompt.ts`) é uma proposta do Igor — falta validar com o cliente.
+- Framework comercial (em `src/agent/systemPrompt.ts`) é uma proposta do Igor — falta validar com o cliente.

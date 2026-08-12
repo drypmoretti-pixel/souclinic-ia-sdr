@@ -4,7 +4,6 @@ import { fileURLToPath } from "node:url";
 import { dirname, join } from "node:path";
 import { supabase } from "../db/supabase.js";
 import { config } from "../config.js";
-import { DEFAULT_INSTRUCTIONS } from "../agent/systemPrompt.js";
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 
@@ -22,24 +21,6 @@ export async function adminRoutes(app: FastifyInstance) {
     if (!config.admin.token || token !== config.admin.token) {
       reply.code(401).send({ error: "unauthorized" });
     }
-  });
-
-  app.get("/admin/api/prompt", async (_request, reply) => {
-    const { data, error } = await supabase.from("agent_settings").select("instructions, updated_at").eq("id", 1).maybeSingle();
-    if (error) return reply.code(500).send({ error: error.message });
-    reply.send({ instructions: data?.instructions ?? DEFAULT_INSTRUCTIONS, updated_at: data?.updated_at ?? null });
-  });
-
-  app.post("/admin/api/prompt", async (request, reply) => {
-    const { instructions } = request.body as { instructions: string };
-    if (!instructions || !instructions.trim()) {
-      return reply.code(400).send({ error: "instructions vazio" });
-    }
-    const { error } = await supabase
-      .from("agent_settings")
-      .upsert({ id: 1, instructions, updated_at: new Date().toISOString() }, { onConflict: "id" });
-    if (error) return reply.code(500).send({ error: error.message });
-    reply.send({ ok: true });
   });
 
   app.get("/admin/api/inbox", async (_request, reply) => {

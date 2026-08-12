@@ -86,12 +86,6 @@
   .badge.agendado { background: color-mix(in srgb, var(--good) 15%, transparent); color: var(--good); }
   .badge.precisa_humano { background: color-mix(in srgb, var(--critical) 15%, transparent); color: var(--critical); }
 
-  textarea {
-    width: 100%; min-height: 360px; font: 13px/1.5 ui-monospace, monospace;
-    background: var(--surface-1); color: var(--text-primary); border: 1px solid var(--border);
-    border-radius: 10px; padding: 14px; resize: vertical;
-  }
-
   #loginScreen {
     display: flex; flex-direction: column; align-items: center; justify-content: center;
     height: 100vh; gap: 12px;
@@ -130,7 +124,6 @@
   <nav class="tabs">
     <button class="tab-btn active" data-tab="overview">Visão geral</button>
     <button class="tab-btn" data-tab="inbox">Conversas</button>
-    <button class="tab-btn" data-tab="prompt">Prompt da IA</button>
   </nav>
 
   <section id="tab-overview">
@@ -147,15 +140,6 @@
     <div class="thread" id="threadView">
       <button id="backToInbox">← Voltar pra lista</button>
       <div id="threadMessages"></div>
-    </div>
-  </section>
-
-  <section id="tab-prompt" class="hidden">
-    <p class="muted">Isso ajusta o tom e a condução da conversa. Regras de segurança (o que a IA pode/não pode falar) ficam fixas no código, não são editáveis aqui.</p>
-    <textarea id="promptText"></textarea>
-    <div style="margin-top: 10px; display: flex; align-items: center; gap: 12px;">
-      <button class="primary" id="savePromptBtn">Salvar</button>
-      <span class="muted" id="promptStatus"></span>
     </div>
   </section>
 </div>
@@ -208,7 +192,6 @@
       document.querySelectorAll("[id^='tab-']").forEach((s) => s.classList.add("hidden"));
       document.getElementById(`tab-${btn.dataset.tab}`).classList.remove("hidden");
       if (btn.dataset.tab === "inbox") loadInbox();
-      if (btn.dataset.tab === "prompt") loadPrompt();
     });
   });
 
@@ -272,26 +255,6 @@
   }
 
   document.getElementById("backToInbox").addEventListener("click", loadInbox);
-
-  async function loadPrompt() {
-    const { instructions, updated_at } = await api("/admin/api/prompt");
-    document.getElementById("promptText").value = instructions;
-    document.getElementById("promptStatus").textContent = updated_at
-      ? `Última atualização: ${formatWhen(updated_at)}`
-      : "";
-  }
-
-  document.getElementById("savePromptBtn").addEventListener("click", async () => {
-    const instructions = document.getElementById("promptText").value;
-    const statusEl = document.getElementById("promptStatus");
-    statusEl.textContent = "Salvando...";
-    try {
-      await api("/admin/api/prompt", { method: "POST", body: JSON.stringify({ instructions }) });
-      statusEl.textContent = "Salvo! (pode levar até 30s pra valer na próxima conversa)";
-    } catch (e) {
-      statusEl.textContent = "Erro ao salvar.";
-    }
-  });
 
   if (getToken()) {
     api("/admin/api/metrics")

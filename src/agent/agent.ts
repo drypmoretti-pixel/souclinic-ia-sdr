@@ -2,7 +2,7 @@ import OpenAI from "openai";
 import type { ChatCompletionMessageParam, ChatCompletionMessageToolCall } from "openai/resources/chat/completions";
 import { config } from "../config.js";
 import { supabase } from "../db/supabase.js";
-import { buildSystemPrompt } from "./systemPrompt.js";
+import { SYSTEM_PROMPT } from "./systemPrompt.js";
 import { toolDefinitions, executeTool, type ToolContext } from "./tools.js";
 
 const client = new OpenAI({ apiKey: config.openai.apiKey });
@@ -40,9 +40,9 @@ async function saveMessage(conversationId: string, direction: "in" | "out", cont
 export async function runAgentTurn(ctx: AgentTurnContext, userMessage: string): Promise<string> {
   await saveMessage(ctx.conversationId, "in", userMessage);
 
-  const [history, systemPrompt] = await Promise.all([loadHistory(ctx.conversationId), buildSystemPrompt()]);
+  const history = await loadHistory(ctx.conversationId);
   const messages: ChatCompletionMessageParam[] = [
-    { role: "system", content: systemPrompt },
+    { role: "system", content: SYSTEM_PROMPT },
     ...history,
     { role: "user", content: userMessage },
   ];
