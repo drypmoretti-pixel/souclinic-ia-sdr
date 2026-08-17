@@ -1,3 +1,4 @@
+import { TIMEZONE } from "../config.js";
 import { checkAvailability } from "../calendar/availability.js";
 import { bookAppointment, rescheduleAppointment, cancelAppointment } from "../calendar/booking.js";
 import { supabase } from "../db/supabase.js";
@@ -112,8 +113,24 @@ export async function executeTool(
       const availability = await checkAvailability();
       const dias = Object.entries(availability).slice(0, 7);
       if (dias.length === 0) return "Não há horários disponíveis nos próximos 14 dias.";
+      // O dia da semana vai explícito: com só a data ISO o modelo errava a
+      // conversão ("quinta" virou a segunda-feira de hoje) e afirmava o dia errado
+      // pro lead. Os horários também vêm separados por período, porque o pedido
+      // mais comum é "de manhã" / "à tarde".
       return dias
-        .map(([data, horarios]) => `${data}: ${horarios.slice(0, 6).join(", ")}${horarios.length > 6 ? "..." : ""}`)
+        .map(([data, horarios]) => {
+          const [ano, mes, dia] = data.split("-").map(Number);
+          const semana = new Intl.DateTimeFormat("pt-BR", {
+            weekday: "long",
+            timeZone: TIMEZONE,
+          }).format(new Date(ano, mes - 1, dia));
+          const manha = horarios.filter((h) => h < "12:00");
+          const tarde = horarios.filter((h) => h >= "12:00");
+          const parte = (label: string, hs: string[]) =>
+            hs.length ? `${label}: ${hs.slice(0, 5).join(", ")}${hs.length > 5 ? "..." : ""}` : "";
+          const partes = [parte("manhã", manha), parte("tarde", tarde)].filter(Boolean).join(" | ");
+          return `${data} (${semana}) -> ${partes}`;
+        })
         .join("\n");
     }
 

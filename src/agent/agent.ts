@@ -1,6 +1,6 @@
 import OpenAI from "openai";
 import type { ChatCompletionMessageParam, ChatCompletionMessageToolCall } from "openai/resources/chat/completions";
-import { config } from "../config.js";
+import { config, TIMEZONE } from "../config.js";
 import { supabase } from "../db/supabase.js";
 import { SYSTEM_PROMPT } from "./systemPrompt.js";
 import { toolDefinitions, executeTool, type ToolContext } from "./tools.js";
@@ -32,6 +32,30 @@ async function loadHistory(conversationId: string): Promise<ChatCompletionMessag
   }));
 }
 
+/**
+ * Âncora temporal do turno. Sem isto o modelo não sabe que dia é hoje e passa a
+ * inventar: num teste real, o lead pediu "quinta de manhã" e a IA ofereceu
+ * "próxima quinta-feira, dia 17 de agosto" — que era a segunda-feira de hoje.
+ * O prompt é estático (montado no import), então a data entra a cada turno.
+ */
+function contextoTemporal(): string {
+  const agora = new Date();
+  const fmt = (opts: Intl.DateTimeFormatOptions) =>
+    new Intl.DateTimeFormat("pt-BR", { timeZone: TIMEZONE, ...opts }).format(agora);
+  return [
+    `## Data e hora de agora`,
+    `Hoje é ${fmt({ weekday: "long", day: "2-digit", month: "long", year: "numeric" })}, ` +
+      `${fmt({ hour: "2-digit", minute: "2-digit" })} (horário de Brasília).`,
+    `A data de hoje no formato das ferramentas é ${fmt({ year: "numeric", month: "2-digit", day: "2-digit" }).split("/").reverse().join("-")}.`,
+    ``,
+    `Use isto para converter o que o lead fala ("amanhã", "quinta", "semana que vem")`,
+    `na data certa. NUNCA afirme o dia da semana de uma data sem conferir com o que`,
+    `a ferramenta check_availability devolveu — ela já informa o dia da semana de cada data.`,
+    `Se o lead pedir um período ("de manhã", "à tarde"), ofereça só horários daquele período:`,
+    `manhã até 12:00, tarde das 12:00 às 18:00, fim de tarde depois das 18:00.`,
+  ].join("\n");
+}
+
 async function saveMessage(conversationId: string, direction: "in" | "out", content: string) {
   const { error } = await supabase.from("messages").insert({ conversation_id: conversationId, direction, content });
   if (error) throw error;
@@ -42,7 +66,7 @@ export async function runAgentTurn(ctx: AgentTurnContext, userMessage: string): 
 
   const history = await loadHistory(ctx.conversationId);
   const messages: ChatCompletionMessageParam[] = [
-    { role: "system", content: SYSTEM_PROMPT },
+    { role: "system", content: `${SYSTEM_PROMPT}\n\n${contextoTemporal()}` },
     ...history,
     { role: "user", content: userMessage },
   ];
