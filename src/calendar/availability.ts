@@ -29,8 +29,15 @@ function toHHMM(minutes: number): string {
   return `${h}:${m}`;
 }
 
+// Data no fuso local (Brasília — ver TIMEZONE no config.ts), não em UTC.
+// Usava toISOString().slice(0,10), que é sempre UTC: depois das 21h de Brasília
+// isso devolvia o dia seguinte, e o filtro de "horários já passados" abaixo parava
+// de casar com hoje — o agente passava a oferecer horário de hoje que já passou.
 function dateKey(d: Date): string {
-  return d.toISOString().slice(0, 10);
+  const y = d.getFullYear();
+  const m = String(d.getMonth() + 1).padStart(2, "0");
+  const day = String(d.getDate()).padStart(2, "0");
+  return `${y}-${m}-${day}`;
 }
 
 export interface AvailabilityByDay {
