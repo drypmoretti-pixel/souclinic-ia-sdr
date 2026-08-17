@@ -8,6 +8,8 @@ import { enviarHumanizado } from "./messaging/humanizado.js";
 import { receberMensagem } from "./messaging/filaConversa.js";
 import { extrairConteudo } from "./messaging/midia.js";
 import { iniciarFollowUps } from "./followup/followup.js";
+import { conversaEstaComHumano } from "./handoff/handoff.js";
+import { registrarMensagemRecebida } from "./db/leads.js";
 import { adminRoutes } from "./admin/routes.js";
 
 const app = Fastify({ logger: true });
@@ -83,9 +85,20 @@ app.post("/webhook/whatsapp", async (request, reply) => {
   // timeout e reenviar a mensagem (o paciente receberia tudo duplicado).
   receberMensagem(telefone, texto, message?.pushName, async (tel, textoAgrupado, nome) => {
     const lead = await ensureLeadConversation(tel, nome);
+
+    // Conversa já passada para a secretária: a mensagem fica registrada (ela
+    // precisa ver o histórico completo no painel), mas a IA não responde. Duas
+    // vozes atendendo o mesmo paciente é pior do que demorar pra responder.
+    if (await conversaEstaComHumano(lead.conversationId)) {
+      await registrarMensagemRecebida(lead.conversationId, textoAgrupado);
+      app.log.info(`${tel} está com atendimento humano — IA não respondeu`);
+      return;
+    }
+
     const respostaTexto = await runAgentTurn(
       { leadId: lead.leadId, leadNome: lead.leadNome, leadTelefone: lead.leadTelefone, conversationId: lead.conversationId },
       textoAgrupado,
+      messaging,
     );
     await enviarHumanizado(messaging, tel, respostaTexto);
   });

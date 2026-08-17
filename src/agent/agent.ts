@@ -4,6 +4,7 @@ import { config, TIMEZONE } from "../config.js";
 import { supabase } from "../db/supabase.js";
 import { SYSTEM_PROMPT } from "./systemPrompt.js";
 import { toolDefinitions, executeTool, type ToolContext } from "./tools.js";
+import type { MessagingProvider } from "../messaging/MessagingProvider.js";
 
 const client = new OpenAI({ apiKey: config.openai.apiKey });
 
@@ -102,7 +103,11 @@ export async function gerarFollowUp(ctx: AgentTurnContext): Promise<string> {
   return texto;
 }
 
-export async function runAgentTurn(ctx: AgentTurnContext, userMessage: string): Promise<string> {
+export async function runAgentTurn(
+  ctx: AgentTurnContext,
+  userMessage: string,
+  messaging: MessagingProvider,
+): Promise<string> {
   await saveMessage(ctx.conversationId, "in", userMessage);
 
   const history = await loadHistory(ctx.conversationId);
@@ -112,7 +117,13 @@ export async function runAgentTurn(ctx: AgentTurnContext, userMessage: string): 
     { role: "user", content: userMessage },
   ];
 
-  const toolCtx: ToolContext = { leadId: ctx.leadId, leadNome: ctx.leadNome, leadTelefone: ctx.leadTelefone };
+  const toolCtx: ToolContext = {
+    leadId: ctx.leadId,
+    leadNome: ctx.leadNome,
+    leadTelefone: ctx.leadTelefone,
+    conversationId: ctx.conversationId,
+    messaging,
+  };
 
   let response = await client.chat.completions.create({
     model: MODEL,

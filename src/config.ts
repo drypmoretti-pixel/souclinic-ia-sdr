@@ -86,6 +86,14 @@ export const config = {
      */
     janelaAgrupamentoMs: Number(process.env.AGRUPAMENTO_MS ?? 8_000),
   },
+  handoff: {
+    /**
+     * WhatsApp da secretária que assume as conversas escaladas. Sem isso o
+     * handoff ainda trava a IA e registra, mas ninguém é avisado — a secretária
+     * só descobre pelo painel.
+     */
+    secretariaWhatsapp: (process.env.SECRETARIA_WHATSAPP ?? "").replace(/\D/g, ""),
+  },
   followup: {
     ativo: (process.env.FOLLOWUP_ATIVO ?? "true") !== "false",
     /** Silêncio necessário antes de cutucar. Padrão 2h, definido pelo Igor. */

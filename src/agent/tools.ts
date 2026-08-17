@@ -1,6 +1,11 @@
 import { TIMEZONE } from "../config.js";
 import { checkAvailability } from "../calendar/availability.js";
 
+import { bookAppointment, rescheduleAppointment, cancelAppointment } from "../calendar/booking.js";
+import { supabase } from "../db/supabase.js";
+import { passarParaHumano } from "../handoff/handoff.js";
+import type { MessagingProvider } from "../messaging/MessagingProvider.js";
+
 /**
  * Formata os dias para o agente. O dia da semana vai explícito: com só a data
  * ISO o modelo errava a conversão ("quinta" virou a segunda-feira de hoje) e
@@ -24,13 +29,14 @@ function formatarDias(dias: [string, string[]][]): string {
     })
     .join("\n");
 }
-import { bookAppointment, rescheduleAppointment, cancelAppointment } from "../calendar/booking.js";
-import { supabase } from "../db/supabase.js";
 
 export interface ToolContext {
   leadId: string;
   leadNome: string;
   leadTelefone: string;
+  conversationId: string;
+  /** Necessário pro handoff avisar a secretária. */
+  messaging: MessagingProvider;
 }
 
 // Formato de tool da OpenAI (Chat Completions "function calling") —
@@ -120,11 +126,20 @@ export const toolDefinitions: OpenAIToolDef[] = [
     function: {
       name: "escalate_to_human",
       description:
-        "Sinaliza que esse lead precisa de atendimento humano (ex: pergunta clínica sensível, pedido de valor sem avaliação, reclamação). Use em vez de tentar responder algo fora do que você pode informar.",
+        "Passa a conversa para a secretária humana. A partir daí VOCÊ PARA de responder esse " +
+        "paciente — use quando realmente não conseguir resolver, não como saída fácil. " +
+        "Use quando: você já tentou duas vezes e o paciente continua sem ser atendido; a pergunta " +
+        "exige informação que não está na sua base; é reclamação, urgência ou dor forte; ou o " +
+        "paciente pede para falar com uma pessoa. Ao chamar, avise o paciente na mesma resposta " +
+        "que alguém da equipe vai continuar o atendimento.",
       parameters: {
         type: "object",
         properties: {
-          motivo: { type: "string", description: "Por que esse lead precisa de um humano" },
+          motivo: {
+            type: "string",
+            description:
+              "Por que precisa de humano, em uma frase — a secretária lê isso pra saber como entrar na conversa",
+          },
         },
         required: ["motivo"],
       },
@@ -215,8 +230,18 @@ export async function executeTool(
 
     case "escalate_to_human": {
       const { motivo } = input as { motivo: string };
-      await supabase.from("leads").update({ status_lead: "precisa_humano" }).eq("id", ctx.leadId);
-      return `Sinalizado para atendimento humano. Motivo: ${motivo}`;
+      await passarParaHumano(ctx.messaging, {
+        leadId: ctx.leadId,
+        conversationId: ctx.conversationId,
+        leadNome: ctx.leadNome,
+        leadTelefone: ctx.leadTelefone,
+        motivo,
+      });
+      return (
+        "Conversa passada para a secretária humana, que já foi avisada. " +
+        "Escreva UMA mensagem curta se despedindo e avisando que alguém da equipe vai continuar. " +
+        "Depois dessa mensagem você não responde mais esse paciente."
+      );
     }
 
     default:

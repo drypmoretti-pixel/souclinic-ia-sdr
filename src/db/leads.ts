@@ -54,3 +54,15 @@ export async function ensureLeadConversation(telefone: string, nome?: string): P
     conversationId,
   };
 }
+
+/**
+ * Grava uma mensagem recebida sem acionar a IA. Usado quando a conversa está
+ * com a secretária: o histórico precisa ficar completo no painel, mas ninguém
+ * responde automaticamente.
+ */
+export async function registrarMensagemRecebida(conversationId: string, content: string): Promise<void> {
+  const { error } = await supabase
+    .from("messages")
+    .insert({ conversation_id: conversationId, direction: "in", content });
+  if (error) throw error;
+}
