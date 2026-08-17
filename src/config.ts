@@ -57,6 +57,25 @@ export const config = {
       .map((n) => n.replace(/\D/g, ""))
       .filter(Boolean),
   },
+  humanizacao: {
+    /** Tempo médio até a resposta sair, mostrando "digitando". 0 desliga. */
+    delayMedioMs: Number(process.env.RESPOSTA_DELAY_MS ?? 30_000),
+    /** Variação aleatória em torno da média (0.25 = ±25%), pra não soar cronometrado. */
+    variacao: Number(process.env.RESPOSTA_DELAY_VARIACAO ?? 0.25),
+    /**
+     * Janela de espera por mais mensagens antes de responder. Gente manda "oi",
+     * depois "queria marcar" — sem isso, cada uma vira uma resposta separada e
+     * a IA fala sozinha em paralelo.
+     */
+    janelaAgrupamentoMs: Number(process.env.AGRUPAMENTO_MS ?? 8_000),
+  },
+  datacrazy: {
+    // CRM. Sem token ou sem etapa configurada, a integração fica desligada e o
+    // resto do sistema segue normal (ver src/crm/datacrazy.ts).
+    token: process.env.DATACRAZY_API_TOKEN ?? "",
+    /** Etapa "consulta agendada" — é onde o negócio nasce. */
+    stageId: process.env.DATACRAZY_STAGE_ID ?? "",
+  },
   admin: {
     // Senha compartilhada do dashboard admin (Igor + cliente). Simples de propósito —
     // mesmo padrão dos outros painéis internos do Igor (financas_casal, painel_comercial).

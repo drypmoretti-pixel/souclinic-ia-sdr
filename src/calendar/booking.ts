@@ -1,5 +1,6 @@
 import { getCalendarClient, CALENDAR_ID } from "./googleCalendar.js";
 import { supabase } from "../db/supabase.js";
+import { registrarConsultaAgendada } from "../crm/datacrazy.js";
 
 const CLINIC_ADDRESS =
   "Avenida Pau Brasil, Lote 06, Loja 02, Edifício E-Business, Águas Claras, DF — CEP 71916-500 (ao lado da Estação de Metrô Águas Claras)";
@@ -45,6 +46,11 @@ export async function bookAppointment({ leadId, leadNome, leadTelefone, date, ti
   if (error) throw error;
 
   await supabase.from("leads").update({ status_lead: "agendado" }).eq("id", leadId);
+
+  // Só aqui o lead entra no CRM — depois da reserva confirmada, não antes.
+  // A função engole os próprios erros de propósito: o paciente já tem horário
+  // marcado, e uma falha do CRM não pode derrubar o atendimento.
+  await registrarConsultaAgendada({ nome: leadNome, telefone: leadTelefone, quando: start });
 
   return { appointment, googleEventId: event.data.id, start, end };
 }

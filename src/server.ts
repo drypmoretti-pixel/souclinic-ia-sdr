@@ -4,6 +4,8 @@ import { ensureLeadConversation } from "./db/leads.js";
 import { runAgentTurn } from "./agent/agent.js";
 import { LocalProvider } from "./messaging/LocalProvider.js";
 import { EvolutionApiProvider } from "./messaging/EvolutionApiProvider.js";
+import { enviarHumanizado } from "./messaging/humanizado.js";
+import { receberMensagem } from "./messaging/filaConversa.js";
 import { adminRoutes } from "./admin/routes.js";
 
 const app = Fastify({ logger: true });
@@ -63,12 +65,17 @@ app.post("/webhook/whatsapp", async (request, reply) => {
     return reply.send({ ok: true, ignored: "numero_nao_liberado" });
   }
 
-  const lead = await ensureLeadConversation(telefone, message?.pushName);
-  const respostaTexto = await runAgentTurn(
-    { leadId: lead.leadId, leadNome: lead.leadNome, leadTelefone: lead.leadTelefone, conversationId: lead.conversationId },
-    texto,
-  );
-  await messaging.sendText(telefone, respostaTexto);
+  // Responde o webhook na hora e processa depois: com o delay humanizado a
+  // resposta leva ~30s, e segurar a conexão faria a Evolution estourar o
+  // timeout e reenviar a mensagem (o paciente receberia tudo duplicado).
+  receberMensagem(telefone, texto, message?.pushName, async (tel, textoAgrupado, nome) => {
+    const lead = await ensureLeadConversation(tel, nome);
+    const respostaTexto = await runAgentTurn(
+      { leadId: lead.leadId, leadNome: lead.leadNome, leadTelefone: lead.leadTelefone, conversationId: lead.conversationId },
+      textoAgrupado,
+    );
+    await enviarHumanizado(messaging, tel, respostaTexto);
+  });
 
   return reply.send({ ok: true });
 });

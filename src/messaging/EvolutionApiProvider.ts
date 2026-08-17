@@ -21,4 +21,19 @@ export class EvolutionApiProvider implements MessagingProvider {
       throw new Error(`Evolution API falhou ao enviar mensagem: ${res.status} ${await res.text()}`);
     }
   }
+
+  async sendPresence(telefone: string, ms: number): Promise<void> {
+    const { apiUrl, apiKey, instance } = config.evolution;
+    const numero = telefone.replace(/\D/g, "");
+    // Best effort: se o "digitando" falhar, a mensagem ainda tem que ir.
+    try {
+      await fetch(`${apiUrl}/chat/sendPresence/${instance}`, {
+        method: "POST",
+        headers: { apikey: apiKey, "Content-Type": "application/json" },
+        body: JSON.stringify({ number: numero, delay: ms, presence: "composing" }),
+      });
+    } catch {
+      /* ignora */
+    }
+  }
 }
