@@ -62,6 +62,14 @@ app.post("/webhook/whatsapp", async (request, reply) => {
     return reply.send({ ok: true });
   }
 
+  // A notificação de handoff sai pelo número da IA, então a secretária pode
+  // responder ali por reflexo. Sem isso ela viraria "lead", a IA responderia, e
+  // no futuro sem allowlist ela apareceria no funil como paciente.
+  if (config.handoff.secretariaWhatsapp && mesmoNumero(config.handoff.secretariaWhatsapp, telefone)) {
+    app.log.info("mensagem da secretária no número da IA — ignorada (ela fala com o paciente direto)");
+    return reply.send({ ok: true, ignored: "secretaria" });
+  }
+
   if (!podeResponder(telefone)) {
     app.log.info(`ignorado: ${telefone} não está em ALLOWED_NUMBERS (modo teste)`);
     return reply.send({ ok: true, ignored: "numero_nao_liberado" });
