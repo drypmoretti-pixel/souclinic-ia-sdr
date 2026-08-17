@@ -10,8 +10,12 @@ const dormir = (ms: number) => new Promise((r) => setTimeout(r, ms));
 /** A presença do WhatsApp expira sozinha em poucos segundos, então é renovada. */
 const FATIA_PRESENCA_MS = 8_000;
 
-/** Acima disso o balão vira parede de texto no celular. */
-const MAX_CHARS_POR_BALAO = 280;
+/**
+ * Acima disso o balão vira parede de texto no celular. Começou em 280 e desceu
+ * pra 160 porque na prática ainda saía mensagem grande demais — 160 é mais ou
+ * menos o tamanho de duas frases curtas de WhatsApp.
+ */
+const MAX_CHARS_POR_BALAO = 160;
 
 /**
  * Quebra a resposta em balões, na ordem de preferência: parágrafos, depois
@@ -60,12 +64,24 @@ async function digitandoPor(
   }
 }
 
+/** Aplica a variação aleatória configurada em cima de um tempo base. */
+function comVariacao(ms: number): number {
+  const { variacao } = config.humanizacao;
+  return Math.round(ms * (1 + (Math.random() * 2 - 1) * variacao));
+}
+
 /**
- * Envia a resposta como uma pessoa mandaria.
- *
- * O tempo total gira em torno de `config.humanizacao.delayMedioMs` (com variação
- * aleatória pra não ficar cronometrado), distribuído entre os balões conforme o
- * tamanho de cada um — balão maior "leva mais tempo pra digitar".
+ * Quanto tempo essa pessoa levaria pra digitar este balão: um piso (ler e
+ * começar a responder) mais um tanto por caractere, limitado por um teto.
+ */
+export function tempoDeDigitacao(balao: string): number {
+  const { msPorChar, pisoMs, tetoMs } = config.humanizacao;
+  return comVariacao(Math.min(pisoMs + balao.length * msPorChar, tetoMs));
+}
+
+/**
+ * Envia a resposta como uma pessoa mandaria: pensa um pouco, digita, manda,
+ * respira, digita de novo.
  */
 export async function enviarHumanizado(
   messaging: MessagingProvider,
@@ -73,20 +89,25 @@ export async function enviarHumanizado(
   texto: string,
 ): Promise<void> {
   const baloes = dividirEmBaloes(texto);
-  const { delayMedioMs, variacao } = config.humanizacao;
 
-  if (delayMedioMs <= 0) {
+  if (config.humanizacao.msPorChar <= 0) {
     for (const b of baloes) await messaging.sendText(telefone, b);
     return;
   }
 
-  // ex.: 30s com variação de 0.25 -> algo entre 22,5s e 37,5s
-  const fator = 1 + (Math.random() * 2 - 1) * variacao;
-  const total = delayMedioMs * fator;
+  const tempos = baloes.map(tempoDeDigitacao);
+  const pausa = comVariacao(config.humanizacao.pausaEntreBaloesMs);
 
-  const chars = baloes.reduce((s, b) => s + b.length, 0) || 1;
-  for (const balao of baloes) {
-    await digitandoPor(messaging, telefone, Math.round(total * (balao.length / chars)));
-    await messaging.sendText(telefone, balao);
+  // Comprime tudo proporcionalmente se a resposta inteira passar do teto.
+  const total = tempos.reduce((s, t) => s + t, 0) + pausa * (baloes.length - 1);
+  const escala = total > config.humanizacao.tetoTotalMs ? config.humanizacao.tetoTotalMs / total : 1;
+
+  for (let i = 0; i < baloes.length; i++) {
+    // Respiro entre um balão e o próximo — sem isso eles saem quase colados,
+    // o que não parece alguém digitando duas mensagens.
+    if (i > 0) await dormir(Math.round(pausa * escala));
+
+    await digitandoPor(messaging, telefone, Math.round(tempos[i] * escala));
+    await messaging.sendText(telefone, baloes[i]);
   }
 }

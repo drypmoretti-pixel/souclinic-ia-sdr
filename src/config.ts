@@ -58,9 +58,26 @@ export const config = {
       .filter(Boolean),
   },
   humanizacao: {
-    /** Tempo médio até a resposta sair, mostrando "digitando". 0 desliga. */
-    delayMedioMs: Number(process.env.RESPOSTA_DELAY_MS ?? 30_000),
-    /** Variação aleatória em torno da média (0.25 = ±25%), pra não soar cronometrado. */
+    /**
+     * O tempo de "digitação" é proporcional ao tamanho do balão, como numa
+     * pessoa de verdade: pergunta simples é respondida rápido, resposta longa
+     * demora. Antes era ~30s fixo pra tudo, e 30s pra responder "oi" ficava
+     * artificial. 0 em msPorChar desliga a humanização inteira.
+     */
+    msPorChar: Number(process.env.RESPOSTA_MS_POR_CHAR ?? 90),
+    /** Tempo mínimo por balão — ler a mensagem e começar a responder. */
+    pisoMs: Number(process.env.RESPOSTA_PISO_MS ?? 3_000),
+    /** Teto por balão, pra texto longo não virar espera eterna. */
+    tetoMs: Number(process.env.RESPOSTA_TETO_MS ?? 35_000),
+    /**
+     * Teto do tempo TOTAL da resposta, somando todos os balões e pausas. Rede de
+     * segurança: se o modelo escapar e escrever demais, a resposta é comprimida
+     * em vez de deixar o paciente 50s esperando.
+     */
+    tetoTotalMs: Number(process.env.RESPOSTA_TETO_TOTAL_MS ?? 40_000),
+    /** Respiro depois de enviar um balão, antes de começar a digitar o próximo. */
+    pausaEntreBaloesMs: Number(process.env.RESPOSTA_PAUSA_BALOES_MS ?? 2_500),
+    /** Variação aleatória aplicada aos tempos (0.25 = ±25%), pra não soar cronometrado. */
     variacao: Number(process.env.RESPOSTA_DELAY_VARIACAO ?? 0.25),
     /**
      * Janela de espera por mais mensagens antes de responder. Gente manda "oi",
