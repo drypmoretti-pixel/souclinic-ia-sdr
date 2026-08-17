@@ -47,6 +47,15 @@ export const config = {
     apiUrl: process.env.EVOLUTION_API_URL ?? "",
     apiKey: process.env.EVOLUTION_API_KEY ?? "",
     instance: process.env.EVOLUTION_INSTANCE ?? "",
+    /**
+     * Trava de teste: se tiver número aqui, a IA só responde a esses; qualquer
+     * outro é ignorado em silêncio. Vazio = atende todo mundo (produção).
+     * Vários números separados por vírgula.
+     */
+    allowedNumbers: (process.env.ALLOWED_NUMBERS ?? "")
+      .split(",")
+      .map((n) => n.replace(/\D/g, ""))
+      .filter(Boolean),
   },
   admin: {
     // Senha compartilhada do dashboard admin (Igor + cliente). Simples de propósito —
