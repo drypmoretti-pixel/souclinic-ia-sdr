@@ -1,6 +1,6 @@
 import { supabase } from "../db/supabase.js";
 import { embed } from "./embeddings.js";
-import { CLINIC_KNOWLEDGE } from "./clinicInfo.js";
+import { CLINIC_KNOWLEDGE, textoParaEmbedding } from "./clinicInfo.js";
 
 // Roda com `npm run ingest`. Reingesta tudo do zero (apaga e recria) —
 // simples o bastante pro volume atual; revisitar se a base crescer muito.
@@ -13,7 +13,9 @@ async function main() {
   );
   if (deleteError) throw deleteError;
 
-  const embeddings = await embed(CLINIC_KNOWLEDGE.map((c) => `${c.title}\n${c.content}`));
+  // Embarca título + perguntas equivalentes + conteúdo; o content gravado (e
+  // devolvido ao agente) continua limpo, sem as perguntas.
+  const embeddings = await embed(CLINIC_KNOWLEDGE.map(textoParaEmbedding));
 
   const rows = CLINIC_KNOWLEDGE.map((chunk, i) => ({
     title: chunk.title,

@@ -1,6 +1,12 @@
-import { CLINIC_KNOWLEDGE } from "../knowledge/clinicInfo.js";
+import { CLINIC_KNOWLEDGE, DIRETRIZES_SDR, type KnowledgeChunk } from "../knowledge/clinicInfo.js";
 
-const KNOWLEDGE_BLOCK = CLINIC_KNOWLEDGE.map((c) => `### ${c.title}\n${c.content}`).join("\n\n");
+const bloco = (chunks: KnowledgeChunk[]) =>
+  chunks.map((c) => `### ${c.title}\n${c.content}`).join("\n\n");
+
+// Os fatos vão pro prompt E pro RAG; as diretrizes de atendimento só pro prompt,
+// pra não competirem com o conteúdo factual na busca por similaridade.
+const KNOWLEDGE_BLOCK = bloco(CLINIC_KNOWLEDGE);
+const DIRETRIZES_BLOCK = bloco(DIRETRIZES_SDR);
 
 // Framework comercial proposto pelo Igor (o material do cliente veio em branco nesse ponto) —
 // baseado nos próprios exemplos de objeção da SouClinic. Ainda não validado com o cliente.
@@ -30,4 +36,7 @@ Localização, especialidades atendidas, horário de funcionamento, dias em que 
 Respostas curtas, como uma conversa real de WhatsApp — não parágrafos longos. Acolhedor, direto, sem forçar. Trate o lead pelo nome quando souber.
 
 ## Base de conhecimento da SouClinic
-${KNOWLEDGE_BLOCK}`;
+${KNOWLEDGE_BLOCK}
+
+## Como a SouClinic atende (persona e objeções)
+${DIRETRIZES_BLOCK}`;
