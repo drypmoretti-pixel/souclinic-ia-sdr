@@ -30,11 +30,11 @@ function montarMensagem(nome: string, quando: Date): string {
   const dia = formatar(quando, { day: "2-digit", month: "2-digit" });
   const hora = formatar(quando, { hour: "2-digit", minute: "2-digit" });
 
-  // Dois parágrafos = duas mensagens no WhatsApp (ver messaging/humanizado.ts).
-  return (
-    `${saudacao}Passando pra lembrar da sua avaliação amanhã, ${diaSemana} (${dia}), às ${hora} 😊\n\n` +
-    `Consegue vir? Se precisar remarcar, é só me falar que eu vejo outro horário.`
-  );
+  // Só o lembrete, sem perguntar se consegue vir e sem oferecer remarcação.
+  // Decisão do Igor: convidar a remarcar dá saída fácil pra quem ia comparecer.
+  // Quem tiver imprevisto pede — e aí a IA remarca normalmente, porque a resposta
+  // do paciente entra no fluxo comum do agente.
+  return `${saudacao}Passando pra lembrar da sua avaliação amanhã, ${diaSemana} (${dia}), às ${hora} 😊`;
 }
 
 interface Pendente {
