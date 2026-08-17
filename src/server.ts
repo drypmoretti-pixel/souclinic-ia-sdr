@@ -6,6 +6,7 @@ import { LocalProvider } from "./messaging/LocalProvider.js";
 import { EvolutionApiProvider } from "./messaging/EvolutionApiProvider.js";
 import { enviarHumanizado } from "./messaging/humanizado.js";
 import { receberMensagem } from "./messaging/filaConversa.js";
+import { extrairConteudo } from "./messaging/midia.js";
 import { adminRoutes } from "./admin/routes.js";
 
 const app = Fastify({ logger: true });
@@ -54,15 +55,26 @@ app.post("/webhook/whatsapp", async (request, reply) => {
   const body = request.body as any;
   const message = body?.data;
   const telefone: string | undefined = message?.key?.remoteJid?.split("@")[0];
-  const texto: string | undefined = message?.message?.conversation ?? message?.message?.extendedTextMessage?.text;
-
-  if (!telefone || !texto || message?.key?.fromMe) {
+  if (!telefone || message?.key?.fromMe) {
     return reply.send({ ok: true });
   }
 
   if (!podeResponder(telefone)) {
     app.log.info(`ignorado: ${telefone} não está em ALLOWED_NUMBERS (modo teste)`);
     return reply.send({ ok: true, ignored: "numero_nao_liberado" });
+  }
+
+  // Áudio vira transcrição e imagem vira descrição antes de o agente ver — daqui
+  // pra frente o sistema inteiro trabalha só com texto. Roda antes da fila
+  // porque a transcrição leva alguns segundos e não pode segurar o webhook.
+  const conteudo = await extrairConteudo(message);
+  if (!conteudo) {
+    app.log.info(`sem conteúdo aproveitável de ${telefone} (figurinha, mídia não suportada ou falha)`);
+    return reply.send({ ok: true, ignored: "sem_conteudo" });
+  }
+  const texto = conteudo.texto;
+  if (conteudo.origem !== "texto") {
+    app.log.info(`${telefone} enviou ${conteudo.origem} -> "${texto.slice(0, 80)}"`);
   }
 
   // Responde o webhook na hora e processa depois: com o delay humanizado a
