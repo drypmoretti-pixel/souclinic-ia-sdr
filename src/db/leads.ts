@@ -5,6 +5,8 @@ export interface LeadConversation {
   leadNome: string;
   leadTelefone: string;
   conversationId: string;
+  /** 'novo' | 'agendado' | 'precisa_humano' — usado pelo guarda-corpo. */
+  leadStatus: string;
 }
 
 // Garante lead + conversa ativa para um telefone, criando o que faltar.
@@ -26,11 +28,14 @@ export async function ensureLeadConversation(telefone: string, nome?: string): P
     lead.nome = nome;
   }
 
+  // A conversa mais recente, seja qual for o status. Filtrar por 'ativa' aqui
+  // furaria o handoff: uma conversa em 'com_humano' não seria encontrada, uma
+  // nova seria criada no lugar, e a IA voltaria a responder por cima da
+  // secretária — exatamente o que o handoff existe pra impedir.
   const { data: conversation, error: convError } = await supabase
     .from("conversations")
     .select("*")
     .eq("lead_id", lead.id)
-    .eq("status", "ativa")
     .order("created_at", { ascending: false })
     .limit(1)
     .maybeSingle();
@@ -52,6 +57,7 @@ export async function ensureLeadConversation(telefone: string, nome?: string): P
     leadNome: lead.nome ?? "sem nome",
     leadTelefone: lead.telefone,
     conversationId,
+    leadStatus: lead.status_lead ?? "novo",
   };
 }
 

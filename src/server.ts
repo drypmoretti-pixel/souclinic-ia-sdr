@@ -9,7 +9,9 @@ import { receberMensagem } from "./messaging/filaConversa.js";
 import { extrairConteudo } from "./messaging/midia.js";
 import { iniciarFollowUps } from "./followup/followup.js";
 import { iniciarLembretes } from "./lembrete/lembrete.js";
-import { conversaEstaComHumano } from "./handoff/handoff.js";
+import { iniciarRevisaoDiaria } from "./revisao/revisaoDiaria.js";
+import { conversaEstaComHumano, passarParaHumano } from "./handoff/handoff.js";
+import { avaliarConversa, mensagemDeTransicao } from "./guardrails/guardrails.js";
 import { registrarMensagemRecebida } from "./db/leads.js";
 import { adminRoutes } from "./admin/routes.js";
 
@@ -110,6 +112,29 @@ app.post("/webhook/whatsapp", async (request, reply) => {
       textoAgrupado,
       messaging,
     );
+
+    // Guarda-corpo: se a IA está repetindo a mesma resposta ou a conversa está
+    // arrastando sem agendar, a secretária entra antes de o paciente desistir.
+    // A resposta que ela gerou fica gravada (útil pra auditoria) mas não é
+    // enviada — mandar de novo o que já não funcionou só piora.
+    const veredito = await avaliarConversa(
+      lead.conversationId,
+      respostaTexto,
+      lead.leadStatus === "agendado",
+    );
+    if (veredito.escalar) {
+      app.log.warn(`guarda-corpo disparou para ${tel}: ${veredito.motivo}`);
+      await passarParaHumano(messaging, {
+        leadId: lead.leadId,
+        conversationId: lead.conversationId,
+        leadNome: lead.leadNome,
+        leadTelefone: lead.leadTelefone,
+        motivo: veredito.motivo,
+      });
+      await enviarHumanizado(messaging, tel, mensagemDeTransicao());
+      return;
+    }
+
     await enviarHumanizado(messaging, tel, respostaTexto);
   });
 
@@ -124,6 +149,7 @@ app
     app.log.info(`SouClinic IA SDR rodando na porta ${config.port}`);
     iniciarFollowUps(messaging);
     iniciarLembretes(messaging);
+    iniciarRevisaoDiaria();
   })
   .catch((err) => {
     app.log.error(err);

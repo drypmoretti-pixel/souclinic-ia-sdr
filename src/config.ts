@@ -94,6 +94,27 @@ export const config = {
      */
     secretariaWhatsapp: (process.env.SECRETARIA_WHATSAPP ?? "").replace(/\D/g, ""),
   },
+  revisao: {
+    ativo: (process.env.REVISAO_ATIVA ?? "true") !== "false",
+    /** Hora (Brasília) do relatório. 20h: depois do expediente da clínica. */
+    hora: Number(process.env.REVISAO_HORA ?? 20),
+    discordWebhook: process.env.DISCORD_WEBHOOK ?? "",
+  },
+  guardrails: {
+    ativo: (process.env.GUARDRAILS_ATIVO ?? "true") !== "false",
+    /** Quantas das últimas respostas da IA são comparadas com a nova. */
+    janelaRepeticao: Number(process.env.GUARDA_JANELA ?? 3),
+    /** Janela onde se contam tentativas de fechar agendamento. */
+    janelaFechamento: Number(process.env.GUARDA_JANELA_FECHAMENTO ?? 5),
+    /** Tentativas de fechamento sem sucesso que disparam o handoff. */
+    tentativasFechamento: Number(process.env.GUARDA_TENTATIVAS_FECHAMENTO ?? 3),
+    /** Proporção de palavras em comum pra considerar "mesma resposta". */
+    limiteSemelhanca: Number(process.env.GUARDA_SEMELHANCA ?? 0.6),
+    /** Quantas repetições disparam o handoff. */
+    repeticoesParaEscalar: Number(process.env.GUARDA_REPETICOES ?? 2),
+    /** Conversa que passa disso sem agendar sai do automático. */
+    maxMensagensSemAgendar: Number(process.env.GUARDA_MAX_MENSAGENS ?? 30),
+  },
   lembrete: {
     ativo: (process.env.LEMBRETE_ATIVO ?? "true") !== "false",
     /**
