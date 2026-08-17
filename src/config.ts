@@ -87,11 +87,15 @@ export const config = {
     janelaAgrupamentoMs: Number(process.env.AGRUPAMENTO_MS ?? 8_000),
   },
   datacrazy: {
-    // CRM. Sem token ou sem etapa configurada, a integração fica desligada e o
-    // resto do sistema segue normal (ver src/crm/datacrazy.ts).
-    token: process.env.DATACRAZY_API_TOKEN ?? "",
-    /** Etapa "consulta agendada" — é onde o negócio nasce. */
-    stageId: process.env.DATACRAZY_STAGE_ID ?? "",
+    /**
+     * URL do webhook de "Entrada de Negócios" do CRM. A etapa de destino
+     * (Agendamentos → Agendado) e a tag IA-SDR são configuradas no painel do
+     * DataCrazy, não aqui. Vazio desliga a integração e o resto segue normal.
+     *
+     * Trate como senha: o webhook não pede autenticação — quem tiver a URL cria
+     * negócio no CRM. O identificador no fim dela é o único segredo.
+     */
+    webhookUrl: process.env.DATACRAZY_WEBHOOK_URL ?? "",
   },
   admin: {
     // Senha compartilhada do dashboard admin (Igor + cliente). Simples de propósito —
