@@ -7,6 +7,7 @@ import { EvolutionApiProvider } from "./messaging/EvolutionApiProvider.js";
 import { enviarHumanizado } from "./messaging/humanizado.js";
 import { receberMensagem } from "./messaging/filaConversa.js";
 import { extrairConteudo } from "./messaging/midia.js";
+import { iniciarFollowUps } from "./followup/followup.js";
 import { adminRoutes } from "./admin/routes.js";
 
 const app = Fastify({ logger: true });
@@ -96,7 +97,10 @@ app.get("/health", async () => ({ ok: true }));
 
 app
   .listen({ port: config.port, host: "0.0.0.0" })
-  .then(() => app.log.info(`SouClinic IA SDR rodando na porta ${config.port}`))
+  .then(() => {
+    app.log.info(`SouClinic IA SDR rodando na porta ${config.port}`);
+    iniciarFollowUps(messaging);
+  })
   .catch((err) => {
     app.log.error(err);
     process.exit(1);

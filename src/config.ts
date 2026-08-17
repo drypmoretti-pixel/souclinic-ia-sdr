@@ -86,6 +86,18 @@ export const config = {
      */
     janelaAgrupamentoMs: Number(process.env.AGRUPAMENTO_MS ?? 8_000),
   },
+  followup: {
+    ativo: (process.env.FOLLOWUP_ATIVO ?? "true") !== "false",
+    /** Silêncio necessário antes de cutucar. Padrão 2h, definido pelo Igor. */
+    aposMs: Number(process.env.FOLLOWUP_APOS_MS ?? 2 * 60 * 60 * 1000),
+    /** De quanto em quanto tempo a varredura roda. */
+    intervaloMs: Number(process.env.FOLLOWUP_INTERVALO_MS ?? 10 * 60 * 1000),
+    /** Tentativas por conversa. Uma só, de propósito — duas já é insistência. */
+    maximo: Number(process.env.FOLLOWUP_MAXIMO ?? 1),
+    /** Janela permitida, em hora de Brasília. Fora dela ninguém é incomodado. */
+    horaInicio: Number(process.env.FOLLOWUP_HORA_INICIO ?? 9),
+    horaFim: Number(process.env.FOLLOWUP_HORA_FIM ?? 19),
+  },
   datacrazy: {
     /**
      * URL do webhook de "Entrada de Negócios" do CRM. A etapa de destino

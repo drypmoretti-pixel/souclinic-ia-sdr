@@ -61,6 +61,47 @@ async function saveMessage(conversationId: string, direction: "in" | "out", cont
   if (error) throw error;
 }
 
+/**
+ * Gera a mensagem de retomada pra quem parou de responder.
+ *
+ * Escrita a partir do histórico real da conversa, não de um texto padrão: uma
+ * pessoa que parou no meio da escolha de horário precisa ouvir algo diferente
+ * de quem parou logo depois de perguntar o preço.
+ *
+ * Sem ferramentas de propósito — follow-up é só uma mensagem. Nada de reservar
+ * horário por conta própria com o lead calado.
+ */
+export async function gerarFollowUp(ctx: AgentTurnContext): Promise<string> {
+  const history = await loadHistory(ctx.conversationId);
+  if (history.length === 0) return "";
+
+  const instrucao = [
+    "A conversa acima parou: o lead leu e não respondeu mais.",
+    "Escreva UMA mensagem curta pra retomar, do jeito que uma recepcionista simpática mandaria.",
+    "",
+    "- Retome o ponto exato onde parou. Se estava escolhendo horário, ofereça o horário de novo.",
+    "- Uma ou duas frases, no máximo. Sem 'passando aqui para saber se você ainda tem interesse'.",
+    "- Não cobre resposta, não crie culpa, não pressione.",
+    "- Não repita o que já foi dito na conversa com as mesmas palavras.",
+    "- Facilite dizer não: deixe claro que ele pode responder depois, sem problema.",
+    "",
+    "Responda APENAS com o texto da mensagem, nada mais.",
+  ].join("\n");
+
+  const response = await client.chat.completions.create({
+    model: MODEL,
+    messages: [
+      { role: "system", content: `${SYSTEM_PROMPT}\n\n${contextoTemporal()}` },
+      ...history,
+      { role: "system", content: instrucao },
+    ],
+  });
+
+  const texto = (response.choices[0].message.content ?? "").trim();
+  if (texto) await saveMessage(ctx.conversationId, "out", texto);
+  return texto;
+}
+
 export async function runAgentTurn(ctx: AgentTurnContext, userMessage: string): Promise<string> {
   await saveMessage(ctx.conversationId, "in", userMessage);
 
