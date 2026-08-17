@@ -1,5 +1,6 @@
 import { supabase } from "../db/supabase.js";
 import { embed } from "./embeddings.js";
+import { BASE_COMPLETA } from "../agent/systemPrompt.js";
 
 export interface RetrievedChunk {
   title: string;
@@ -21,6 +22,35 @@ export interface RetrievedChunk {
  * informação certa. Na dúvida, deixa passar.
  */
 export const SIMILARITY_THRESHOLD = 0.35;
+
+/**
+ * Monta o bloco de informações da clínica que vai no contexto do agente, a cada
+ * mensagem do paciente.
+ *
+ * Estratégia deliberadamente conservadora, porque o custo dos dois erros é
+ * assimétrico: recuperar um chunk a mais só ocupa contexto, enquanto deixar de
+ * recuperar o certo faz a IA responder errado sobre convênio ou preço.
+ *
+ * Por isso: busca com folga (5 resultados), e **qualquer falha cai para a base
+ * completa** — que hoje tem ~2,5 mil caracteres e cabe tranquilamente. O RAG
+ * aqui serve para a base poder crescer sem estourar o prompt, não para economizar
+ * tokens agora.
+ */
+export async function montarContextoDaBase(pergunta: string): Promise<string> {
+  const cabecalho = "INFORMAÇÕES DA CLÍNICA (responda com base nisto):";
+  try {
+    const chunks = await retrieveRelevantKnowledge(pergunta, 5);
+    if (chunks.length === 0) {
+      // Nada passou do corte: pergunta fora do escopo, ou muito vaga ("oi").
+      // Mandar a base inteira é melhor do que mandar nada — a IA decide o que usar.
+      return `${cabecalho}\n\n${BASE_COMPLETA}`;
+    }
+    return `${cabecalho}\n\n${chunks.map((c) => `### ${c.title}\n${c.content}`).join("\n\n")}`;
+  } catch (err) {
+    console.error(`[rag] busca falhou, usando base completa: ${(err as Error).message}`);
+    return `${cabecalho}\n\n${BASE_COMPLETA}`;
+  }
+}
 
 export async function retrieveRelevantKnowledge(
   query: string,

@@ -3,10 +3,15 @@ import { CLINIC_KNOWLEDGE, DIRETRIZES_SDR, type KnowledgeChunk } from "../knowle
 const bloco = (chunks: KnowledgeChunk[]) =>
   chunks.map((c) => `### ${c.title}\n${c.content}`).join("\n\n");
 
-// Os fatos vão pro prompt E pro RAG; as diretrizes de atendimento só pro prompt,
-// pra não competirem com o conteúdo factual na busca por similaridade.
-const KNOWLEDGE_BLOCK = bloco(CLINIC_KNOWLEDGE);
+// As diretrizes de atendimento vão fixas no prompt — regra de comportamento não
+// pode depender de busca. Já os FATOS da clínica são injetados por turno pelo
+// RAG (ver montarContextoDaBase em src/knowledge/retrieve.ts), com a base
+// completa como fallback: assim a base pode crescer sem estourar o prompt, e
+// uma falha de busca nunca deixa a IA sem informação.
 const DIRETRIZES_BLOCK = bloco(DIRETRIZES_SDR);
+
+/** Base inteira. Fallback quando a busca falha — hoje cabe folgado no contexto. */
+export const BASE_COMPLETA = bloco(CLINIC_KNOWLEDGE);
 
 // Framework comercial proposto pelo Igor (o material do cliente veio em branco nesse ponto) —
 // baseado nos próprios exemplos de objeção da SouClinic. Ainda não validado com o cliente.
@@ -82,8 +87,8 @@ Lead: "vocês aceitam meu plano odontológico?"
 Você: "Não trabalhamos com convênio, o atendimento é só particular 😊"
       "Mas a avaliação é gratuita, e dá pra parcelar o tratamento. Quer que eu veja um horário?"
 
-## Base de conhecimento da SouClinic
-${KNOWLEDGE_BLOCK}
-
 ## Como a SouClinic atende (persona e objeções)
-${DIRETRIZES_BLOCK}`;
+${DIRETRIZES_BLOCK}
+
+## Informações da clínica
+As informações factuais da SouClinic (convênio, preço, horário, endereço, especialidades, formas de pagamento) chegam a você a cada mensagem, num bloco chamado "INFORMAÇÕES DA CLÍNICA". Responda SEMPRE com base nele. Se a resposta não estiver lá, você não sabe — diga que vai confirmar com a equipe.`;

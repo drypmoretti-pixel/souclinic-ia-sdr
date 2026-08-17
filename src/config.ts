@@ -94,6 +94,15 @@ export const config = {
      */
     secretariaWhatsapp: (process.env.SECRETARIA_WHATSAPP ?? "").replace(/\D/g, ""),
   },
+  lembrete: {
+    ativo: (process.env.LEMBRETE_ATIVO ?? "true") !== "false",
+    /**
+     * Hora do dia (Brasília) em que o lembrete da véspera sai. 18h pega a pessoa
+     * no fim do expediente, com tempo de avisar se não puder vir — o que libera
+     * o horário para outro paciente.
+     */
+    horaEnvio: Number(process.env.LEMBRETE_HORA ?? 18),
+  },
   followup: {
     ativo: (process.env.FOLLOWUP_ATIVO ?? "true") !== "false",
     /** Silêncio necessário antes de cutucar. Padrão 2h, definido pelo Igor. */

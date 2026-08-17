@@ -8,6 +8,7 @@ import { enviarHumanizado } from "./messaging/humanizado.js";
 import { receberMensagem } from "./messaging/filaConversa.js";
 import { extrairConteudo } from "./messaging/midia.js";
 import { iniciarFollowUps } from "./followup/followup.js";
+import { iniciarLembretes } from "./lembrete/lembrete.js";
 import { conversaEstaComHumano } from "./handoff/handoff.js";
 import { registrarMensagemRecebida } from "./db/leads.js";
 import { adminRoutes } from "./admin/routes.js";
@@ -48,6 +49,7 @@ app.post("/dev/chat", async (request, reply) => {
   const reply_ = await runAgentTurn(
     { leadId: lead.leadId, leadNome: lead.leadNome, leadTelefone: lead.leadTelefone, conversationId: lead.conversationId },
     texto,
+    messaging,
   );
   return reply.send({ reply: reply_ });
 });
@@ -121,6 +123,7 @@ app
   .then(() => {
     app.log.info(`SouClinic IA SDR rodando na porta ${config.port}`);
     iniciarFollowUps(messaging);
+    iniciarLembretes(messaging);
   })
   .catch((err) => {
     app.log.error(err);

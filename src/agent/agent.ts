@@ -3,6 +3,7 @@ import type { ChatCompletionMessageParam, ChatCompletionMessageToolCall } from "
 import { config, TIMEZONE } from "../config.js";
 import { supabase } from "../db/supabase.js";
 import { SYSTEM_PROMPT } from "./systemPrompt.js";
+import { montarContextoDaBase } from "../knowledge/retrieve.js";
 import { toolDefinitions, executeTool, type ToolContext } from "./tools.js";
 import type { MessagingProvider } from "../messaging/MessagingProvider.js";
 
@@ -94,6 +95,7 @@ export async function gerarFollowUp(ctx: AgentTurnContext): Promise<string> {
     messages: [
       { role: "system", content: `${SYSTEM_PROMPT}\n\n${contextoTemporal()}` },
       ...history,
+      { role: "system", content: await montarContextoDaBase(history.map((h) => h.content).join(" ")) },
       { role: "system", content: instrucao },
     ],
   });
@@ -111,9 +113,15 @@ export async function runAgentTurn(
   await saveMessage(ctx.conversationId, "in", userMessage);
 
   const history = await loadHistory(ctx.conversationId);
+
+  // Informações da clínica buscadas pela mensagem atual. Vão DEPOIS do histórico
+  // e logo antes da pergunta, que é onde o modelo mais presta atenção.
+  const contextoBase = await montarContextoDaBase(userMessage);
+
   const messages: ChatCompletionMessageParam[] = [
     { role: "system", content: `${SYSTEM_PROMPT}\n\n${contextoTemporal()}` },
     ...history,
+    { role: "system", content: contextoBase },
     { role: "user", content: userMessage },
   ];
 
