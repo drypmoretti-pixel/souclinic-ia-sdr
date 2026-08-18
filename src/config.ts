@@ -114,6 +114,10 @@ export const config = {
     repeticoesParaEscalar: Number(process.env.GUARDA_REPETICOES ?? 2),
     /** Conversa que passa disso sem agendar sai do automático. */
     maxMensagensSemAgendar: Number(process.env.GUARDA_MAX_MENSAGENS ?? 30),
+    /** Repetição só conta depois que a conversa já andou. */
+    minMensagensParaRepeticao: Number(process.env.GUARDA_MIN_MENSAGENS_REPETICAO ?? 8),
+    /** E só em respostas de tamanho real — saudação curta se repete por natureza. */
+    minTamanhoRepeticao: Number(process.env.GUARDA_MIN_TAMANHO_REPETICAO ?? 80),
   },
   lembrete: {
     ativo: (process.env.LEMBRETE_ATIVO ?? "true") !== "false",

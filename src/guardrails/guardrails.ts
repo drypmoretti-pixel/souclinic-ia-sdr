@@ -55,8 +55,20 @@ const PADROES_FECHAMENTO = [
   /posso (te )?colocar/i,
 ];
 
+/** Um horário concreto: "13:00", "9h", "às 10h30". */
+const HORARIO_CONCRETO = /\b\d{1,2}\s?(:\d{2}|h\d{0,2})\b/;
+
+/**
+ * Tentativa de FECHAR um horário específico — não o convite genérico a agendar.
+ *
+ * A distinção é o que separa travamento de conversa saudável, e custou um falso
+ * positivo em produção: "Quer que eu veja um horário?" é como a IA convida pra
+ * agendar em toda conversa normal, e contar isso fazia o guarda-corpo escalar
+ * atendimentos que estavam indo bem. Só conta quando há um horário concreto na
+ * mensagem — aí sim ela está tentando fechar, e repetir significa que não fechou.
+ */
 function ehTentativaDeFechamento(texto: string): boolean {
-  return PADROES_FECHAMENTO.some((p) => p.test(texto));
+  return HORARIO_CONCRETO.test(texto) && PADROES_FECHAMENTO.some((p) => p.test(texto));
 }
 
 export interface Veredito {
@@ -109,7 +121,16 @@ export async function avaliarConversa(
 
   // 2. Repetição literal: a resposta nova é quase igual a algo que ela acabou de
   // dizer. Pega o caso mais óbvio, quando ela repete quase palavra por palavra.
-  const recentes = daIA.slice(0, config.guardrails.janelaRepeticao);
+  //
+  // Só vale em conversa que já andou e em respostas de tamanho real. No começo é
+  // normal e correto repetir: paciente que manda "oi" e depois "bom dia" recebe
+  // a mesma saudação duas vezes, e isso não é travamento — foi um falso positivo
+  // em produção que escalou um atendimento saudável.
+  const conversaAndou = mensagens.length >= config.guardrails.minMensagensParaRepeticao;
+  const respostaSubstancial = respostaProposta.length >= config.guardrails.minTamanhoRepeticao;
+  const recentes = conversaAndou && respostaSubstancial
+    ? daIA.slice(0, config.guardrails.janelaRepeticao).filter((m) => m.length >= config.guardrails.minTamanhoRepeticao)
+    : [];
   const parecidas = recentes.filter(
     (m) => semelhanca(m, respostaProposta) >= config.guardrails.limiteSemelhanca,
   ).length;
@@ -120,7 +141,7 @@ export async function avaliarConversa(
     };
   }
 
-  // 2. Conversa arrastando sem chegar a lugar nenhum.
+  // 3. Conversa arrastando sem chegar a lugar nenhum.
   if (mensagens.length >= config.guardrails.maxMensagensSemAgendar) {
     return {
       escalar: true,
