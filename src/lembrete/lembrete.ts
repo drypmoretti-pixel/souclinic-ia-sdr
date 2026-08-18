@@ -113,7 +113,7 @@ export async function rodarLembretes(messaging: MessagingProvider): Promise<numb
   }
 }
 
-/** Liga a varredura horária. Chamado uma vez, no boot. */
+/** Liga a varredura periódica. Chamado uma vez, no boot. */
 export function iniciarLembretes(messaging: MessagingProvider): void {
   const { ativo, horaEnvio } = config.lembrete;
   if (!ativo) {
@@ -123,9 +123,12 @@ export function iniciarLembretes(messaging: MessagingProvider): void {
 
   console.log(`[lembrete] ligado — avisa às ${horaEnvio}h sobre as avaliações do dia seguinte`);
 
-  // De hora em hora; o filtro de hora dentro de rodarLembretes decide se age.
-  // Mais simples e mais robusto a reinício do que agendar um disparo único.
+  // A cada 10 minutos, não de hora em hora. Com intervalo de 1h, o ciclo conta a
+  // partir do boot: um restart às 18h30 empurra os disparos para 19h30, 20h30...
+  // e o lembrete do dia inteiro é perdido em silêncio. Foi o que aconteceu no
+  // primeiro dia em produção. Com 10min há ~6 chances dentro da hora certa, e o
+  // campo lembrete_enviado_at impede envio repetido.
   setInterval(() => {
     void rodarLembretes(messaging);
-  }, 60 * 60 * 1000).unref?.();
+  }, 10 * 60 * 1000).unref?.();
 }

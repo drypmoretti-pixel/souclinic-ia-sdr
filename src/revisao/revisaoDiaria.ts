@@ -153,7 +153,7 @@ export async function rodarRevisao(dia = hojeLocal()): Promise<string | null> {
   }
 }
 
-/** Liga a checagem horária; o filtro de hora decide quando de fato roda. */
+/** Liga a checagem periódica; o filtro de hora decide quando de fato roda. */
 export function iniciarRevisaoDiaria(): void {
   const { ativo, hora } = config.revisao;
   if (!ativo) {
@@ -164,13 +164,16 @@ export function iniciarRevisaoDiaria(): void {
   console.log(`[revisão] ligada — relatório diário às ${hora}h no Discord`);
 
   let ultimoDia = "";
+  // Mesma lógica do lembrete: checagem frequente em vez de intervalo longo, pra
+  // um restart não fazer o ciclo pular a hora do relatório.
   setInterval(() => {
     const dia = hojeLocal();
-    // A trava por dia evita relatório repetido se o intervalo disparar duas
-    // vezes dentro da mesma hora.
+    // Trava por dia contra relatório repetido. É em memória, então um restart
+    // dentro da hora do envio pode gerar um segundo relatório — irritante, mas
+    // muito melhor do que o silêncio de não enviar nenhum.
     if (horaLocal() === hora && dia !== ultimoDia) {
       ultimoDia = dia;
       void rodarRevisao(dia);
     }
-  }, 30 * 60 * 1000).unref?.();
+  }, 10 * 60 * 1000).unref?.();
 }
