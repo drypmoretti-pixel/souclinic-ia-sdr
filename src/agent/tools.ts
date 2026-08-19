@@ -207,6 +207,25 @@ export async function executeTool(
 
     case "book_appointment": {
       const { date, time } = input as { date: string; time: string };
+
+      // Trava contra horário inventado. Em teste real a IA ofereceu "hoje às
+      // 19h30" com a clínica fechando às 19h — copiou a ESTRUTURA do roteiro
+      // ("consigo um encaixe para HOJE às 16h") e preencheu com hora fabricada.
+      // Instrução no prompt não basta: aqui a reserva é recusada de fato, e o
+      // agente recebe de volta os horários que existem mesmo.
+      const disponivel = await checkAvailability();
+      const doDia = disponivel[date] ?? [];
+      if (!doDia.includes(time)) {
+        const alternativas = doDia.length
+          ? `Horários livres em ${date}: ${doDia.slice(0, 6).join(", ")}`
+          : `Não há nenhum horário livre em ${date}.`;
+        return (
+          `RESERVA RECUSADA: ${date} às ${time} não está disponível — ou está fora do ` +
+          `horário de atendimento, ou já passou, ou está ocupado. NÃO diga ao paciente que ` +
+          `está agendado. Ofereça um horário real da lista abaixo.\n${alternativas}`
+        );
+      }
+
       await bookAppointment({
         leadId: ctx.leadId,
         leadNome: ctx.leadNome,
