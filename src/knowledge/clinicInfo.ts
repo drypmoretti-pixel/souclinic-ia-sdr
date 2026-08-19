@@ -66,12 +66,18 @@ export const CLINIC_KNOWLEDGE: KnowledgeChunk[] = [
     perguntas: [
       "A primeira consulta é paga?",
       "Quanto custa a avaliação?",
+      "Como funciona a avaliação?",
+      "Vocês fazem raio-X?",
+      "Tem raio-X na clínica?",
+      "Quem faz a avaliação?",
       "A consulta de avaliação tem custo?",
       "Preciso pagar pra ser atendido na primeira vez?",
       "Não tenho dinheiro pra primeira consulta",
     ],
     content:
-      "A primeira consulta é uma avaliação personalizada, sem compromisso e sem custo. O paciente só começa a pagar quando decide iniciar o tratamento. É uma avaliação geral, com o próximo dentista disponível — não precisa escolher especialista.",
+      "A avaliação é com a cirurgiã-dentista e não tem custo. É feita uma análise completa e, se necessário, " +
+      "o raio-X pode ser realizado na própria unidade. Na mesma consulta o paciente recebe a indicação da melhor " +
+      "solução e o planejamento do tratamento começa ali. O paciente só passa a pagar se decidir iniciar o tratamento.",
   },
   {
     title: "Formas de pagamento e parcelamento",
@@ -122,7 +128,9 @@ export const CLINIC_KNOWLEDGE: KnowledgeChunk[] = [
       "Vocês têm outra unidade?",
     ],
     content:
-      "Avenida Pau Brasil, Lote 06, Loja 02, Edifício E-Business, Águas Claras — DF, CEP 71916-500. Fica ao lado da Estação de Metrô Águas Claras, então dá pra vir de metrô sem se preocupar com estacionamento. Unidade única.",
+      "A clínica é bem fácil de chegar: fica em frente à estação de Metrô Águas Claras, ao lado do Subway. " +
+      "O endereço é Av. Pau Brasil, Lote 06, Loja 02 — Edifício comercial E-Business, no Térreo — Águas Claras, DF, CEP 71916-500. " +
+      "Unidade única. Ao falar de localização, mencione primeiro a facilidade de acesso e só depois o endereço.",
   },
   {
     title: "Especialidades e tratamentos atendidos",

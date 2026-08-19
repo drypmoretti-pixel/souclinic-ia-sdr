@@ -13,6 +13,18 @@ import type { MessagingProvider } from "../messaging/MessagingProvider.js";
  * o pedido mais comum é "de manhã" / "à tarde".
  */
 function formatarDias(dias: [string, string[]][]): string {
+  // "hoje" e "amanhã" marcados de forma explícita: o cliente quer que a oferta
+  // priorize as próximas 48h, e o modelo escolhe melhor com o rótulo do que
+  // tendo que deduzir a proximidade a partir da data.
+  const iso = (d: Date) =>
+    new Intl.DateTimeFormat("pt-BR", { timeZone: TIMEZONE, year: "numeric", month: "2-digit", day: "2-digit" })
+      .format(d)
+      .split("/")
+      .reverse()
+      .join("-");
+  const hoje = iso(new Date());
+  const amanha = iso(new Date(Date.now() + 24 * 60 * 60 * 1000));
+
   return dias
     .map(([data, horarios]) => {
       const [ano, mes, dia] = data.split("-").map(Number);
@@ -20,12 +32,13 @@ function formatarDias(dias: [string, string[]][]): string {
         weekday: "long",
         timeZone: TIMEZONE,
       }).format(new Date(ano, mes - 1, dia));
+      const rotulo = data === hoje ? " [HOJE — prefira]" : data === amanha ? " [AMANHÃ — prefira]" : "";
       const manha = horarios.filter((h) => h < "12:00");
       const tarde = horarios.filter((h) => h >= "12:00");
       const parte = (label: string, hs: string[]) =>
         hs.length ? `${label}: ${hs.slice(0, 5).join(", ")}${hs.length > 5 ? "..." : ""}` : "";
       const partes = [parte("manhã", manha), parte("tarde", tarde)].filter(Boolean).join(" | ");
-      return `${data} (${semana}) -> ${partes}`;
+      return `${data} (${semana})${rotulo} -> ${partes}`;
     })
     .join("\n");
 }
