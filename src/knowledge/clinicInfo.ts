@@ -112,9 +112,12 @@ export const CLINIC_KNOWLEDGE: KnowledgeChunk[] = [
       "Até que horas fica aberto?",
       "Qual o horário de funcionamento?",
       "Atende no fim de semana?",
+      "Abre em feriado?",
+      "Vocês atendem no feriado?",
     ],
     content:
-      "Segunda a sexta das 9h às 19h. Sábado das 9h às 17h. Domingo a clínica não abre.",
+      "Segunda a sexta das 9h às 19h. Sábado das 9h às 17h. Domingo a clínica não abre. " +
+      "Em feriado a clínica também não abre.",
   },
   {
     title: "Endereço, como chegar e estacionamento",
