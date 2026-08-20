@@ -4,6 +4,7 @@ import { checkAvailability } from "../calendar/availability.js";
 import { bookAppointment, rescheduleAppointment, cancelAppointment } from "../calendar/booking.js";
 import { supabase } from "../db/supabase.js";
 import { passarParaHumano } from "../handoff/handoff.js";
+import { EXPLICACAO_AVALIACAO } from "./garantirExplicacao.js";
 import type { MessagingProvider } from "../messaging/MessagingProvider.js";
 
 /**
@@ -58,21 +59,6 @@ async function explicacaoJaFoiDada(conversationId: string): Promise<boolean> {
   return (data ?? []).some((m) => /cirurgi|raio-?x/i.test(m.content));
 }
 
-/**
- * Texto que o cliente definiu para explicar a avaliação. Entra no retorno da
- * ferramenta quando ainda não foi dito.
- *
- * Está aqui, e não só no prompt, porque no prompt não funcionou: mesmo com a
- * regra escrita em três lugares e um resumo final, o modelo consultava a agenda
- * e emendava direto nos horários, pulando a explicação — a reclamação nº 1 do
- * cliente. Instrução entregue junto do dado, no instante da decisão, é bem mais
- * difícil de ignorar do que instrução no início do contexto.
- */
-const EXPLICACAO_AVALIACAO =
-  "Funciona assim: você passará por uma avaliação com a nossa cirurgiã-dentista. " +
-  "Essa avaliação não tem custo. Faremos uma análise completa e, se necessário, o raio-X " +
-  "poderá ser realizado na própria unidade. Lá mesmo, você receberá a indicação da melhor " +
-  "solução e iniciaremos o planejamento do seu tratamento.";
 
 export interface ToolContext {
   leadId: string;

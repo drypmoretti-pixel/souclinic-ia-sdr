@@ -4,7 +4,7 @@
   "private": true,
   "type": "module",
   "scripts": {
-    "build": "tsc -p tsconfig.json && mkdir -p dist/admin && cp src/admin/dashboard.html dist/admin/dashboard.html",
+    "build": "tsc -p tsconfig.json && mkdir -p dist/admin && cp src/admin/dashboard.html dist/admin/dashboard.html && (git rev-parse --short HEAD > dist/versao.txt 2>/dev/null || echo desconhecida > dist/versao.txt)",
     "dev": "tsx watch src/server.ts",
     "chat": "tsx src/dev/chatCli.ts",
     "ingest": "tsx src/knowledge/ingest.ts",

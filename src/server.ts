@@ -1,4 +1,5 @@
 import Fastify from "fastify";
+import { readFileSync } from "node:fs";
 import { config } from "./config.js";
 import { ensureLeadConversation } from "./db/leads.js";
 import { runAgentTurn } from "./agent/agent.js";
@@ -13,6 +14,7 @@ import { iniciarRevisaoDiaria } from "./revisao/revisaoDiaria.js";
 import { conversaEstaComHumano, passarParaHumano } from "./handoff/handoff.js";
 import { avaliarConversa, mensagemDeTransicao } from "./guardrails/guardrails.js";
 import { registrarMensagemRecebida } from "./db/leads.js";
+import { garantirExplicacao } from "./agent/garantirExplicacao.js";
 import { adminRoutes } from "./admin/routes.js";
 
 const app = Fastify({ logger: true });
@@ -50,12 +52,12 @@ if (config.evolution.allowedNumbers.length > 0) {
 app.post("/dev/chat", async (request, reply) => {
   const { telefone, nome, texto } = request.body as { telefone: string; nome?: string; texto: string };
   const lead = await ensureLeadConversation(telefone, nome);
-  const reply_ = await runAgentTurn(
+  const gerada = await runAgentTurn(
     { leadId: lead.leadId, leadNome: lead.leadNome, leadTelefone: lead.leadTelefone, conversationId: lead.conversationId },
     texto,
     messaging,
   );
-  return reply.send({ reply: reply_ });
+  return reply.send({ reply: await garantirExplicacao(lead.conversationId, gerada) });
 });
 
 // Webhook da Evolution API (MESSAGES_UPSERT) — plugar quando a instância existir.
@@ -109,11 +111,16 @@ app.post("/webhook/whatsapp", async (request, reply) => {
       return;
     }
 
-    const respostaTexto = await runAgentTurn(
+    const gerada = await runAgentTurn(
       { leadId: lead.leadId, leadNome: lead.leadNome, leadTelefone: lead.leadTelefone, conversationId: lead.conversationId },
       textoAgrupado,
       messaging,
     );
+
+    // Não sai oferta de horário sem o paciente saber como é a avaliação. Isso é
+    // garantido aqui, no código, e não por instrução ao modelo — ver
+    // agent/garantirExplicacao.ts.
+    const respostaTexto = await garantirExplicacao(lead.conversationId, gerada);
 
     // Guarda-corpo: se a IA está repetindo a mesma resposta ou a conversa está
     // arrastando sem agendar, a secretária entra antes de o paciente desistir.
@@ -143,7 +150,15 @@ app.post("/webhook/whatsapp", async (request, reply) => {
   return reply.send({ ok: true });
 });
 
-app.get("/health", async () => ({ ok: true }));
+// Identifica o que está rodando. Sem isso, "o deploy foi feito?" e "a correção
+// não funcionou?" ficam indistinguíveis de fora — aconteceu mais de uma vez.
+let VERSAO = "desconhecida";
+try {
+  VERSAO = readFileSync(new URL("versao.txt", import.meta.url), "utf8").trim();
+} catch {
+  /* build antigo, sem o arquivo */
+}
+app.get("/health", async () => ({ ok: true, versao: VERSAO, subiuEm: new Date().toISOString() }));
 
 app
   .listen({ port: config.port, host: "0.0.0.0" })
