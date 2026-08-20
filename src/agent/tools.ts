@@ -43,6 +43,37 @@ function formatarDias(dias: [string, string[]][]): string {
     .join("\n");
 }
 
+/** A explicação da avaliação já foi dada nesta conversa? */
+async function explicacaoJaFoiDada(conversationId: string): Promise<boolean> {
+  const { data } = await supabase
+    .from("messages")
+    .select("content")
+    .eq("conversation_id", conversationId)
+    .eq("direction", "out")
+    .order("created_at", { ascending: false })
+    .limit(20);
+
+  // "cirurgiã-dentista" e "raio-X" só aparecem na explicação da avaliação, então
+  // servem de marcador barato e confiável de que ela já foi dada.
+  return (data ?? []).some((m) => /cirurgi|raio-?x/i.test(m.content));
+}
+
+/**
+ * Texto que o cliente definiu para explicar a avaliação. Entra no retorno da
+ * ferramenta quando ainda não foi dito.
+ *
+ * Está aqui, e não só no prompt, porque no prompt não funcionou: mesmo com a
+ * regra escrita em três lugares e um resumo final, o modelo consultava a agenda
+ * e emendava direto nos horários, pulando a explicação — a reclamação nº 1 do
+ * cliente. Instrução entregue junto do dado, no instante da decisão, é bem mais
+ * difícil de ignorar do que instrução no início do contexto.
+ */
+const EXPLICACAO_AVALIACAO =
+  "Funciona assim: você passará por uma avaliação com a nossa cirurgiã-dentista. " +
+  "Essa avaliação não tem custo. Faremos uma análise completa e, se necessário, o raio-X " +
+  "poderá ser realizado na própria unidade. Lá mesmo, você receberá a indicação da melhor " +
+  "solução e iniciaremos o planejamento do seu tratamento.";
+
 export interface ToolContext {
   leadId: string;
   leadNome: string;
@@ -202,7 +233,20 @@ export async function executeTool(
       }
 
       if (dias.length === 0) return "Não há horários disponíveis nos próximos 14 dias.";
-      return formatarDias(dias);
+
+      const horarios = formatarDias(dias);
+      if (await explicacaoJaFoiDada(ctx.conversationId)) return horarios;
+
+      return (
+        "PARE. Você ainda não explicou como funciona a avaliação nesta conversa, e NÃO PODE " +
+        "oferecer horário antes disso.\n\n" +
+        "Envie PRIMEIRO esta explicação (pode adaptar as palavras, mas mantenha tudo: a " +
+        "cirurgiã-dentista, o custo zero, a análise completa, o raio-X na unidade e a indicação " +
+        "na hora):\n\n" +
+        `"${EXPLICACAO_AVALIACAO}"\n\n` +
+        "DEPOIS dela, na mesma resposta, ofereça duas destas opções:\n" +
+        horarios
+      );
     }
 
     case "book_appointment": {
