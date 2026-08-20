@@ -130,6 +130,21 @@ export async function rodarLembretes(
         const erro = (err as Error).message;
         resultado.falhas.push({ telefone: p.leadTelefone, erro });
         console.error(`[lembrete] erro em ${p.leadTelefone}: ${erro}`);
+
+        // Número que não existe no WhatsApp nunca vai funcionar — cadastro com
+        // dígito errado, por exemplo. Sem isso a varredura tentaria esse
+        // agendamento às 18h de todo dia, para sempre. Falha temporária (rede,
+        // Evolution fora do ar) continua sem marca, pra ser tentada de novo.
+        if (/"exists"\s*:\s*false/.test(erro)) {
+          await supabase
+            .from("appointments")
+            .update({ lembrete_enviado_at: new Date().toISOString() })
+            .eq("id", p.id);
+          console.warn(
+            `[lembrete] ${p.leadTelefone} não existe no WhatsApp — marcado pra não tentar de novo. ` +
+              `Confira o telefone do paciente ${p.leadNome || "(sem nome)"}.`,
+          );
+        }
       }
     }
     return resultado;
