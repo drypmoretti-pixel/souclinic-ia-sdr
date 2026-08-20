@@ -131,9 +131,10 @@ export const CLINIC_KNOWLEDGE: KnowledgeChunk[] = [
       "Vocês têm outra unidade?",
     ],
     content:
-      "A clínica é bem fácil de chegar: fica em frente à estação de Metrô Águas Claras, ao lado do Subway. " +
-      "O endereço é Av. Pau Brasil, Lote 06, Loja 02 — Edifício comercial E-Business, no Térreo — Águas Claras, DF, CEP 71916-500. " +
-      "Unidade única. Ao falar de localização, mencione primeiro a facilidade de acesso e só depois o endereço.",
+      "A clínica fica EM FRENTE à estação de Metrô Águas Claras, AO LADO DO SUBWAY. " +
+      "Endereço: Av. Pau Brasil, Lote 06, Loja 02 — Edifício comercial E-Business, no Térreo — " +
+      "Águas Claras, DF, CEP 71916-500. Unidade única. " +
+      "Não existe estacionamento próprio; a referência é o metrô, que fica em frente.",
   },
   {
     title: "Especialidades e tratamentos atendidos",

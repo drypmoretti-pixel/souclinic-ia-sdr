@@ -141,6 +141,8 @@ export const config = {
     repeticoesParaEscalar: Number(process.env.GUARDA_REPETICOES ?? 2),
     /** Conversa que passa disso sem agendar sai do automático. */
     maxMensagensSemAgendar: Number(process.env.GUARDA_MAX_MENSAGENS ?? 30),
+    /** Janela considerada "a conversa atual". Fora dela nada é contado. */
+    janelaHoras: Number(process.env.GUARDA_JANELA_HORAS ?? 6),
     /** Repetição só conta depois que a conversa já andou. */
     minMensagensParaRepeticao: Number(process.env.GUARDA_MIN_MENSAGENS_REPETICAO ?? 8),
     /** E só em respostas de tamanho real — saudação curta se repete por natureza. */

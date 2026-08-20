@@ -94,10 +94,16 @@ export async function avaliarConversa(
   // Quem já agendou pode conversar à vontade: o objetivo foi cumprido.
   if (leadJaAgendou) return OK;
 
+  // Só o que foi trocado nas últimas horas. Um lead que volta dias depois soma
+  // mensagens no mesmo registro de conversa, e contar o relacionamento inteiro
+  // escalava atendimento saudável: aconteceu com um paciente que voltou no
+  // terceiro dia e bateu 31 mensagens acumuladas numa conversa que ia bem.
+  const desde = new Date(Date.now() - config.guardrails.janelaHoras * 60 * 60 * 1000).toISOString();
   const { data, error } = await supabase
     .from("messages")
     .select("direction, content")
     .eq("conversation_id", conversationId)
+    .gte("created_at", desde)
     .order("created_at", { ascending: false })
     .limit(40);
   if (error) return OK; // guarda-corpo com defeito não pode derrubar atendimento
@@ -141,11 +147,11 @@ export async function avaliarConversa(
     };
   }
 
-  // 3. Conversa arrastando sem chegar a lugar nenhum.
+  // 3. Conversa arrastando sem chegar a lugar nenhum — dentro da janela.
   if (mensagens.length >= config.guardrails.maxMensagensSemAgendar) {
     return {
       escalar: true,
-      motivo: `conversa longa (${mensagens.length} mensagens) sem agendamento`,
+      motivo: `${mensagens.length} mensagens nas últimas ${config.guardrails.janelaHoras}h sem agendamento`,
     };
   }
 
