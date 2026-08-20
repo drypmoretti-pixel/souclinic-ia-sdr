@@ -1,4 +1,6 @@
 import { getCalendarClient, CALENDAR_ID } from "./googleCalendar.js";
+import { config } from "../config.js";
+import { slotsPorDia } from "./slotsDisponiveis.js";
 
 // Horário de atendimento da SouClinic (seg-sex 9h-19h, sáb 9h-17h, dom fechado).
 // weekday: 0 = domingo ... 6 = sábado
@@ -45,6 +47,10 @@ export interface AvailabilityByDay {
 }
 
 export async function checkAvailability(): Promise<AvailabilityByDay> {
+  // Modelo novo (padrão): a IA só oferece o que o time publicou como evento
+  // livre na agenda. Ver src/calendar/slotsDisponiveis.ts para o porquê.
+  if (config.slots.explicito) return slotsPorDia();
+
   const calendar = getCalendarClient();
   const calendarId = CALENDAR_ID();
 

@@ -1,6 +1,8 @@
 import { getCalendarClient, CALENDAR_ID } from "./googleCalendar.js";
 import { supabase } from "../db/supabase.js";
 import { registrarConsultaAgendada } from "../crm/datacrazy.js";
+import { config } from "../config.js";
+import { acharSlot } from "./slotsDisponiveis.js";
 
 const CLINIC_ADDRESS =
   "Avenida Pau Brasil, Lote 06, Loja 02, Edifício E-Business, Águas Claras, DF — CEP 71916-500 (ao lado da Estação de Metrô Águas Claras)";
@@ -22,16 +24,41 @@ export async function bookAppointment({ leadId, leadNome, leadTelefone, date, ti
   const start = new Date(`${date}T${time}:00`);
   const end = new Date(start.getTime() + SLOT_MINUTES * 60_000);
 
-  const event = await calendar.events.insert({
-    calendarId,
-    requestBody: {
-      summary: `Avaliação odontológica — ${leadNome}`,
-      description: `Avaliação odontológica — SouClinic\nPaciente: ${leadNome}\nTelefone: ${leadTelefone}\nEndereço: ${CLINIC_ADDRESS}`,
-      location: CLINIC_ADDRESS,
-      start: { dateTime: start.toISOString(), timeZone: "America/Sao_Paulo" },
-      end: { dateTime: end.toISOString(), timeZone: "America/Sao_Paulo" },
-    },
-  });
+  const corpo = {
+    summary: `Avaliação odontológica — ${leadNome}`,
+    description: `Avaliação odontológica — SouClinic\nPaciente: ${leadNome}\nTelefone: ${leadTelefone}\nEndereço: ${CLINIC_ADDRESS}`,
+    location: CLINIC_ADDRESS,
+  };
+
+  // No modelo de slots explícitos, agendar é CONVERTER a vaga publicada pelo
+  // time: o mesmo evento deixa de dizer "Horário disponível" e passa a ser a
+  // avaliação do paciente. Criar um evento novo por cima deixaria a vaga viva na
+  // agenda e ela seria oferecida de novo — duas pessoas na mesma cadeira.
+  // Com três cadeiras, três eventos livres no mesmo horário são três vagas
+  // independentes, e cada agendamento consome uma.
+  let event;
+  if (config.slots.explicito) {
+    const slot = await acharSlot(date, time);
+    if (!slot) {
+      throw new Error(
+        `Não há vaga publicada em ${date} às ${time}. O horário pode ter sido preenchido agora.`,
+      );
+    }
+    event = await calendar.events.patch({
+      calendarId,
+      eventId: slot.eventId,
+      requestBody: corpo,
+    });
+  } else {
+    event = await calendar.events.insert({
+      calendarId,
+      requestBody: {
+        ...corpo,
+        start: { dateTime: start.toISOString(), timeZone: "America/Sao_Paulo" },
+        end: { dateTime: end.toISOString(), timeZone: "America/Sao_Paulo" },
+      },
+    });
+  }
 
   const { data: appointment, error } = await supabase
     .from("appointments")

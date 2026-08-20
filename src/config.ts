@@ -100,6 +100,26 @@ export const config = {
     hora: Number(process.env.REVISAO_HORA ?? 20),
     discordWebhook: process.env.DISCORD_WEBHOOK ?? "",
   },
+  slots: {
+    /**
+     * Modelo de agenda. `true` = a IA só oferece horários que o time publicou
+     * como evento no Google Calendar; `false` = o modelo antigo, todo o
+     * expediente menos o que está ocupado.
+     */
+    explicito: (process.env.SLOTS_EXPLICITOS ?? "true") !== "false",
+    /**
+     * O que o time escreve no título do evento para marcar uma vaga. Comparação
+     * sem acento e sem caixa, por "contém" — "Horário disponível", "DISPONIVEL"
+     * e "livre 14h" funcionam igual.
+     */
+    palavrasChave: (process.env.SLOTS_PALAVRAS ?? "disponivel,disponível,livre,vago")
+      .toLowerCase()
+      .normalize("NFD")
+      .replace(/[\u0300-\u036f]/g, "")
+      .split(",")
+      .map((p) => p.trim())
+      .filter(Boolean),
+  },
   guardrails: {
     ativo: (process.env.GUARDRAILS_ATIVO ?? "true") !== "false",
     /** Quantas das últimas respostas da IA são comparadas com a nova. */
