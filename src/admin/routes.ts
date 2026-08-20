@@ -4,10 +4,12 @@ import { fileURLToPath } from "node:url";
 import { dirname, join } from "node:path";
 import { supabase } from "../db/supabase.js";
 import { config } from "../config.js";
+import { rodarLembretes } from "../lembrete/lembrete.js";
+import type { MessagingProvider } from "../messaging/MessagingProvider.js";
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 
-export async function adminRoutes(app: FastifyInstance) {
+export async function adminRoutes(app: FastifyInstance, opts: { messaging?: MessagingProvider } = {}) {
   // A página em si é pública (só um shell com campo de senha) — os dados
   // é que ficam atrás do header x-admin-token, checado abaixo.
   app.get("/admin", async (_request, reply) => {
@@ -21,6 +23,20 @@ export async function adminRoutes(app: FastifyInstance) {
     if (!config.admin.token || token !== config.admin.token) {
       reply.code(401).send({ error: "unauthorized" });
     }
+  });
+
+  /**
+   * Dispara a varredura de lembretes na hora, ignorando a janela das 18h.
+   *
+   * Existe por dois motivos: diagnosticar (a resposta diz quantos pendentes
+   * havia, quantos saíram e o erro de cada falha — sem isso só dá pra descobrir
+   * pelo log da máquina) e reenviar à mão quando a janela é perdida por queda ou
+   * deploy.
+   */
+  app.post("/admin/api/lembretes/rodar", async (_request, reply) => {
+    if (!opts.messaging) return reply.code(500).send({ error: "messaging não configurado" });
+    const resultado = await rodarLembretes(opts.messaging, { forcar: true });
+    reply.send(resultado);
   });
 
   app.get("/admin/api/inbox", async (_request, reply) => {

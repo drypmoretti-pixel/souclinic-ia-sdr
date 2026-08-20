@@ -16,9 +16,11 @@ import { registrarMensagemRecebida } from "./db/leads.js";
 import { adminRoutes } from "./admin/routes.js";
 
 const app = Fastify({ logger: true });
-await app.register(adminRoutes);
 
 const messaging = config.evolution.apiUrl ? new EvolutionApiProvider() : new LocalProvider();
+
+// O painel precisa do provider pra poder disparar lembrete à mão.
+await app.register(adminRoutes, { messaging });
 
 /**
  * Compara dois telefones ignorando diferença de formato — código do país e o

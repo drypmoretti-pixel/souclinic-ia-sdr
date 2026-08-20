@@ -80,14 +80,38 @@ async function buscarPendentes(): Promise<Pendente[]> {
     }));
 }
 
-/** Uma passada. Exportada separada pra poder ser chamada à mão em teste. */
-export async function rodarLembretes(messaging: MessagingProvider): Promise<number> {
-  if (!config.lembrete.ativo) return 0;
-  if (horaLocal() !== config.lembrete.horaEnvio) return 0;
+export interface ResultadoLembretes {
+  rodou: boolean;
+  motivo?: string;
+  encontrados: number;
+  enviados: number;
+  falhas: { telefone: string; erro: string }[];
+}
+
+/**
+ * Uma passada. `forcar` ignora a checagem de horário — usado pelo endpoint
+ * administrativo, que existe para diagnosticar e para reenviar à mão quando a
+ * janela das 18h é perdida (queda, deploy, etc.).
+ */
+export async function rodarLembretes(
+  messaging: MessagingProvider,
+  opts: { forcar?: boolean } = {},
+): Promise<ResultadoLembretes> {
+  const vazio: ResultadoLembretes = { rodou: false, encontrados: 0, enviados: 0, falhas: [] };
+
+  if (!config.lembrete.ativo) return { ...vazio, motivo: "LEMBRETE_ATIVO=false" };
+  if (!opts.forcar && horaLocal() !== config.lembrete.horaEnvio) {
+    return { ...vazio, motivo: `fora da hora de envio (agora ${horaLocal()}h, configurado ${config.lembrete.horaEnvio}h)` };
+  }
 
   try {
     const pendentes = await buscarPendentes();
-    let enviados = 0;
+    // Log em toda passada, inclusive quando não há nada: sem isso não dá pra
+    // distinguir "a rotina não rodou" de "rodou e não achou ninguém" — foi
+    // exatamente essa dúvida que travou o diagnóstico da primeira vez.
+    console.log(`[lembrete] varredura às ${horaLocal()}h — ${pendentes.length} pendente(s)`);
+
+    const resultado: ResultadoLembretes = { rodou: true, encontrados: pendentes.length, enviados: 0, falhas: [] };
 
     for (const p of pendentes) {
       try {
@@ -97,19 +121,22 @@ export async function rodarLembretes(messaging: MessagingProvider): Promise<numb
           .from("appointments")
           .update({ lembrete_enviado_at: new Date().toISOString() })
           .eq("id", p.id);
-        // Sem a marca o lembrete sairia de novo na próxima hora — por isso é erro.
+        // Sem a marca o lembrete sairia de novo na próxima varredura.
         if (error) console.error(`[lembrete] FALHA AO MARCAR ${p.id}: ${error.message}`);
 
-        enviados++;
+        resultado.enviados++;
         console.log(`[lembrete] enviado para ${p.leadNome || p.leadTelefone}`);
       } catch (err) {
-        console.error(`[lembrete] erro em ${p.leadTelefone}: ${(err as Error).message}`);
+        const erro = (err as Error).message;
+        resultado.falhas.push({ telefone: p.leadTelefone, erro });
+        console.error(`[lembrete] erro em ${p.leadTelefone}: ${erro}`);
       }
     }
-    return enviados;
+    return resultado;
   } catch (err) {
-    console.error(`[lembrete] varredura falhou: ${(err as Error).message}`);
-    return 0;
+    const erro = (err as Error).message;
+    console.error(`[lembrete] varredura falhou: ${erro}`);
+    return { ...vazio, rodou: true, motivo: `erro: ${erro}` };
   }
 }
 
