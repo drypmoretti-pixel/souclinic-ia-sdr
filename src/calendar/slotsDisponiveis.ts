@@ -80,12 +80,26 @@ export async function buscarSlotsLivres(diasAFrente = 14): Promise<SlotLivre[]> 
     const inicio = new Date(ev.start.dateTime);
     if (inicio <= agora) continue;
 
+    // A vaga vale o tempo do próprio evento. Um bloco de 4h criado achando que
+    // "libera a tarde toda" viraria UMA vaga de 4 horas, não quatro de 1h — o
+    // combinado com o time é um evento por vaga. O aviso serve pra flagrar isso
+    // antes de virar paciente marcado em horário estranho.
+    const fim = new Date(ev.end.dateTime);
+    const minutos = Math.round((fim.getTime() - inicio.getTime()) / 60_000);
+    if (Math.abs(minutos - config.slots.duracaoEsperadaMin) > 15) {
+      console.warn(
+        `[slots] "${ev.summary}" em ${dataLocal(inicio)} ${horaLocal(inicio)} dura ${minutos}min ` +
+          `(esperado ~${config.slots.duracaoEsperadaMin}min). Vale conferir com a clínica — ` +
+          `o combinado é um evento por vaga.`,
+      );
+    }
+
     slots.push({
       eventId: ev.id,
       data: dataLocal(inicio),
       hora: horaLocal(inicio),
       inicio,
-      fim: new Date(ev.end.dateTime),
+      fim,
     });
   }
   return slots;

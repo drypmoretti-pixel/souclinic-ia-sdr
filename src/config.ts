@@ -109,16 +109,23 @@ export const config = {
     explicito: (process.env.SLOTS_EXPLICITOS ?? "true") !== "false",
     /**
      * O que o time escreve no título do evento para marcar uma vaga. Comparação
-     * sem acento e sem caixa, por "contém" — "Horário disponível", "DISPONIVEL"
-     * e "livre 14h" funcionam igual.
+     * sem acento e sem caixa, por "contém": "Horário disponível", "horario
+     * disponivel" e "DISPONÍVEL" funcionam igual.
+     *
+     * Só "disponivel", de propósito. Aceitar "livre" ou "vago" também casaria
+     * com evento pessoal do time — "sala livre", "horário livre pro almoço" —
+     * e a IA ofereceria uma cadeira que não existe. O cliente confirmou que o
+     * título será sempre "Horário disponível".
      */
-    palavrasChave: (process.env.SLOTS_PALAVRAS ?? "disponivel,disponível,livre,vago")
+    palavrasChave: (process.env.SLOTS_PALAVRAS ?? "disponivel")
       .toLowerCase()
       .normalize("NFD")
       .replace(/[\u0300-\u036f]/g, "")
       .split(",")
       .map((p) => p.trim())
       .filter(Boolean),
+    /** Duração esperada de uma vaga, em minutos. Fora disso, avisa no log. */
+    duracaoEsperadaMin: Number(process.env.SLOTS_DURACAO_MIN ?? 60),
   },
   guardrails: {
     ativo: (process.env.GUARDRAILS_ATIVO ?? "true") !== "false",
