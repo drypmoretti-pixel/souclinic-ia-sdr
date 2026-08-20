@@ -52,6 +52,88 @@ async function dizer(telefone, texto) {
 
 const sem = (s) => s.toLowerCase().normalize("NFD").replace(/[̀-ͯ]/g, "");
 
+// ---------------------------------------------------------------------------
+// Vagas de teste no Google Calendar.
+//
+// Desde que a agenda passou a funcionar por slots explícitos, a IA só oferece o
+// que o time publicou. Sem publicar nada, os cenários de agendamento falham por
+// falta de vaga e não por defeito — foi o que aconteceu na primeira execução
+// depois da mudança. A suíte passa a criar as próprias vagas e removê-las.
+// ---------------------------------------------------------------------------
+async function tokenGoogle() {
+  const { createSign } = await import("node:crypto");
+  const key = env.GOOGLE_PRIVATE_KEY.replace(/^"|"$/g, "").replace(/\\n/g, "\n");
+  const b64 = (o) => Buffer.from(JSON.stringify(o)).toString("base64url");
+  const agora = Math.floor(Date.now() / 1000);
+  const naoAssinado = `${b64({ alg: "RS256", typ: "JWT" })}.${b64({
+    iss: env.GOOGLE_CLIENT_EMAIL,
+    scope: "https://www.googleapis.com/auth/calendar",
+    aud: "https://oauth2.googleapis.com/token",
+    iat: agora,
+    exp: agora + 3600,
+  })}`;
+  const assinatura = createSign("RSA-SHA256").update(naoAssinado).sign(key, "base64url");
+  const r = await fetch("https://oauth2.googleapis.com/token", {
+    method: "POST",
+    headers: { "content-type": "application/x-www-form-urlencoded" },
+    body: new URLSearchParams({
+      grant_type: "urn:ietf:params:oauth:grant-type:jwt-bearer",
+      assertion: `${naoAssinado}.${assinatura}`,
+    }),
+  });
+  return (await r.json()).access_token;
+}
+
+const MARCA_TESTE = "[SUITE]";
+const CAL = () => encodeURIComponent(env.GOOGLE_CALENDAR_ID);
+
+/** Publica vagas nos próximos dias úteis, como o time da clínica faria. */
+async function publicarVagas(T) {
+  const criadas = [];
+  for (let d = 1; d <= 3; d++) {
+    const dia = new Date(Date.now() + d * 864e5);
+    const iso = new Intl.DateTimeFormat("pt-BR", { timeZone: "America/Sao_Paulo", year: "numeric", month: "2-digit", day: "2-digit" })
+      .format(dia).split("/").reverse().join("-");
+    const diaSemana = new Date(`${iso}T12:00:00-03:00`).getDay();
+    if (diaSemana === 0) continue; // domingo a clínica não abre
+    for (const hora of ["09:00", "14:00"]) {
+      const r = await fetch(`https://www.googleapis.com/calendar/v3/calendars/${CAL()}/events`, {
+        method: "POST",
+        headers: { authorization: `Bearer ${T}`, "content-type": "application/json" },
+        body: JSON.stringify({
+          summary: `Horário disponível ${MARCA_TESTE}`,
+          start: { dateTime: `${iso}T${hora}:00-03:00`, timeZone: "America/Sao_Paulo" },
+          end: { dateTime: `${iso}T${String(Number(hora.slice(0, 2)) + 1).padStart(2, "0")}:00:00-03:00`, timeZone: "America/Sao_Paulo" },
+        }),
+      });
+      const j = await r.json();
+      if (j.id) criadas.push(j.id);
+    }
+  }
+  return criadas;
+}
+
+/** Remove tudo que a suíte criou na agenda, inclusive vaga já convertida. */
+async function limparAgenda(T) {
+  const r = await fetch(
+    `https://www.googleapis.com/calendar/v3/calendars/${CAL()}/events?timeMin=${new Date().toISOString()}&timeMax=${new Date(Date.now() + 14 * 864e5).toISOString()}&singleEvents=true&maxResults=250`,
+    { headers: { authorization: `Bearer ${T}` } },
+  );
+  const j = await r.json();
+  let n = 0;
+  for (const e of j.items ?? []) {
+    const ehDaSuite =
+      (e.summary ?? "").includes(MARCA_TESTE) || (e.description ?? "").includes("Teste Automatizado");
+    if (!ehDaSuite) continue;
+    await fetch(`https://www.googleapis.com/calendar/v3/calendars/${CAL()}/events/${e.id}`, {
+      method: "DELETE",
+      headers: { authorization: `Bearer ${T}` },
+    });
+    n++;
+  }
+  return n;
+}
+
 /** Verificações que um cenário pode declarar sobre uma resposta. */
 const CHECAGENS = {
   contem: (resp, termos) => termos.filter((t) => !sem(resp).includes(sem(t))),
@@ -140,6 +222,17 @@ const CENARIOS = [
     turnos: [{ diz: "vocês abrem em feriado?", casa: ["n[ãa]o (abre|abrimos|atende)"] }],
   },
   {
+    nome: "Agendamento completo: explica, oferece e reserva de verdade",
+    origem: "a IA pedia confirmação em loop e nunca chamava book_appointment",
+    turnos: [
+      { diz: "oi, quero marcar uma avaliação" },
+      { diz: "implante" },
+      { diz: "primeira vez", contem: ["cirurgi"], casa: ["\\d{1,2}[h:]"] },
+      { diz: "pode ser o primeiro horário que você falou", casa: ["agendad|marcad|confirmad"] },
+    ],
+    aoFinal: { agendou: true, naoEscalada: true },
+  },
+  {
     nome: "Conversa longa saudável não é desligada",
     origem: "guarda-corpo escalou conversa de cliente com 31 msgs de 2 dias somadas",
     turnos: [
@@ -197,6 +290,12 @@ async function rodarCenario(c) {
 }
 
 console.log(`Suíte de conversas — ${BASE}\n${"─".repeat(64)}`);
+
+const T = await tokenGoogle();
+await limparAgenda(T); // sobra de execução anterior interrompida
+const vagas = await publicarVagas(T);
+console.log(`  (${vagas.length} vagas de teste publicadas na agenda)\n`);
+
 let ok = 0;
 const problemas = [];
 
@@ -211,6 +310,9 @@ for (const c of CENARIOS) {
     problemas.push({ c, falhas, transcricao });
   }
 }
+
+const removidas = await limparAgenda(T);
+console.log(`\n  (${removidas} eventos de teste removidos da agenda)`);
 
 console.log("─".repeat(64));
 console.log(`${ok}/${CENARIOS.length} cenários passaram\n`);
