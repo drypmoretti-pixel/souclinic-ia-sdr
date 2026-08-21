@@ -171,7 +171,11 @@ const CENARIOS = [
     turnos: [
       {
         diz: "oi, queria saber como funciona",
-        contem: ["procedimento"],
+        // Qualquer forma de perguntar o procedimento serve — o que importa é ela
+        // perguntar antes de explicar, não a palavra usada. A primeira versão
+        // exigia o termo "procedimento" e reprovou uma resposta correta
+        // ("O que você está buscando fazer? Implante, aparelho, lente?").
+        casa: ["procedimento|implante|aparelho|est[áa] buscando|o que voc[êe] (precisa|procura)"],
         naoContem: ["boleto", "gratuita e sem compromisso"],
       },
       { diz: "queria fazer implante", casa: ["avalia[çc][ãa]o|outra cl[íi]nica|primeira vez"] },
