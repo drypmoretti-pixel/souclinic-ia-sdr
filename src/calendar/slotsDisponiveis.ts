@@ -30,6 +30,38 @@ export interface SlotLivre {
   fim: Date;
 }
 
+/**
+ * Expediente da clínica: seg-sex 9h-19h, sáb 9h-17h, domingo fechado.
+ * Índice = dia da semana (0 = domingo).
+ */
+const EXPEDIENTE: Record<number, [string, string] | null> = {
+  0: null,
+  1: ["09:00", "19:00"],
+  2: ["09:00", "19:00"],
+  3: ["09:00", "19:00"],
+  4: ["09:00", "19:00"],
+  5: ["09:00", "19:00"],
+  6: ["09:00", "17:00"],
+};
+
+/**
+ * A vaga publicada cai dentro do expediente?
+ *
+ * Existe porque a publicação é manual: basta alguém errar o dia ao arrastar um
+ * evento e a IA passa a oferecer horário com a clínica fechada. Apareceu na
+ * prática — uma vaga foi parar num domingo. O sistema confia no time para saber
+ * QUANDO tem cadeira livre, mas não para reescrever o horário de funcionamento.
+ */
+function dentroDoExpediente(inicio: Date, fim: Date): boolean {
+  // getDay() é o dia local, e o processo roda fixado em Brasília (config.ts).
+  const janela = EXPEDIENTE[inicio.getDay()];
+  if (!janela) return false;
+
+  const hIni = fmt(inicio, { hour: "2-digit", minute: "2-digit", hour12: false });
+  const hFim = fmt(fim, { hour: "2-digit", minute: "2-digit", hour12: false });
+  return hIni >= janela[0] && hFim <= janela[1];
+}
+
 function fmt(d: Date, opts: Intl.DateTimeFormatOptions): string {
   return new Intl.DateTimeFormat("pt-BR", { timeZone: TIMEZONE, ...opts }).format(d);
 }
@@ -92,6 +124,15 @@ export async function buscarSlotsLivres(diasAFrente = 14): Promise<SlotLivre[]> 
           `(esperado ~${config.slots.duracaoEsperadaMin}min). Vale conferir com a clínica — ` +
           `o combinado é um evento por vaga.`,
       );
+    }
+
+    if (!dentroDoExpediente(inicio, fim)) {
+      console.warn(
+        `[slots] IGNORADA: "${ev.summary}" em ${dataLocal(inicio)} ${horaLocal(inicio)} está fora do ` +
+          `horário de atendimento (seg-sex 9h-19h, sáb 9h-17h, domingo fechado). ` +
+          `Confira a agenda com a clínica.`,
+      );
+      continue;
     }
 
     slots.push({
