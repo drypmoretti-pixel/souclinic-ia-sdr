@@ -16,13 +16,17 @@ import { supabase } from "../db/supabase.js";
 
 /** Texto definido pelo cliente. */
 export const EXPLICACAO_AVALIACAO =
-  "Funciona assim: você passará por uma avaliação com a nossa cirurgiã-dentista. " +
-  "Essa avaliação não tem custo. Faremos uma análise completa e, se necessário, o raio-X " +
-  "poderá ser realizado na própria unidade. Lá mesmo, você receberá a indicação da melhor " +
-  "solução e iniciaremos o planejamento do seu tratamento.";
+  "Para isso, você precisa passar por uma avaliação completa aqui em nossa clínica, onde nosso " +
+  "cirurgião dentista examina sua situação, faz uma análise completa e elabora o plano de tratamento.\n\n" +
+  "E essa avaliação, diagnóstico e plano de tratamento não tem custo, fora que a gente fica muito bem " +
+  "localizado, sendo de fácil acesso (em frente a estação de metrô de Águas Claras).";
 
-/** "cirurgiã" e "raio-x" só aparecem nessa explicação — servem de marcador. */
-const MARCADOR = /cirurgi|raio-?\s?x/i;
+/**
+ * Marcador de que a explicação já saiu. "cirurgião/cirurgiã" e "não tem custo"
+ * só aparecem nela; "raio-x" fica do texto anterior, para conversas em andamento
+ * quando a mudança subiu.
+ */
+const MARCADOR = /cirurgi|n[ãa]o tem custo|sem custo|raio-?\s?x/i;
 
 /**
  * A resposta está OFERECENDO um horário — não apenas citando horas.

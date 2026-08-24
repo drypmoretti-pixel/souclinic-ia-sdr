@@ -114,17 +114,20 @@ export const toolDefinitions: OpenAIToolDef[] = [
       description:
         "RESERVA DE VERDADE a avaliação no horário informado. É esta ferramenta que efetiva o " +
         "agendamento — sem chamá-la, NADA é marcado, por mais que a conversa pareça concluída. " +
-        "Chame IMEDIATAMENTE assim que o lead concordar com um horário ('sim', 'pode', 'isso', " +
-        "'fechado', 'pode marcar', repetir o horário). NÃO chame check_availability de novo antes: " +
-        "você já tem a disponibilidade, e reconsultar faz você perder o horário combinado. " +
-        "NUNCA pergunte 'posso confirmar?' duas vezes — se o lead já disse sim, reserve.",
+        "Exige os dados do paciente: peça nome completo, data de nascimento e e-mail DEPOIS que ele " +
+        "escolher o horário e ANTES de chamar esta ferramenta. Sem os três, a reserva é recusada. " +
+        "NÃO chame check_availability de novo antes: você já tem a disponibilidade. " +
+        "NUNCA pergunte 'posso confirmar?' duas vezes — se o lead já disse sim, colete os dados e reserve.",
       parameters: {
         type: "object",
         properties: {
           date: { type: "string", description: "Data no formato YYYY-MM-DD" },
           time: { type: "string", description: "Horário no formato HH:MM (24h)" },
+          nome_completo: { type: "string", description: "Nome completo do paciente, como ele informou" },
+          data_nascimento: { type: "string", description: "Data de nascimento no formato YYYY-MM-DD" },
+          email: { type: "string", description: "E-mail do paciente" },
         },
-        required: ["date", "time"],
+        required: ["date", "time", "nome_completo", "data_nascimento", "email"],
       },
     },
   },
@@ -236,7 +239,24 @@ export async function executeTool(
     }
 
     case "book_appointment": {
-      const { date, time } = input as { date: string; time: string };
+      const { date, time, nome_completo, data_nascimento, email } = input as {
+        date: string; time: string; nome_completo?: string; data_nascimento?: string; email?: string;
+      };
+
+      // A clínica exige os três para abrir ficha. Recusar aqui, e não confiar na
+      // instrução, é o que garante que nenhum agendamento entre incompleto — o
+      // mesmo princípio das outras travas deste arquivo.
+      const faltando = [
+        !nome_completo?.trim() && "nome completo",
+        !data_nascimento?.trim() && "data de nascimento",
+        !email?.trim() && "e-mail",
+      ].filter(Boolean);
+      if (faltando.length) {
+        return (
+          `RESERVA RECUSADA: falta ${faltando.join(", ")}. NÃO diga que está agendado. ` +
+          `Peça ao paciente o que falta e só então chame esta ferramenta de novo.`
+        );
+      }
 
       // Trava contra horário inventado. Em teste real a IA ofereceu "hoje às
       // 19h30" com a clínica fechando às 19h — copiou a ESTRUTURA do roteiro
@@ -256,14 +276,25 @@ export async function executeTool(
         );
       }
 
+      await supabase
+        .from("leads")
+        .update({
+          nome_completo,
+          data_nascimento,
+          email,
+          // O nome de exibição passa a ser o informado, não o apelido do WhatsApp.
+          nome: nome_completo,
+        })
+        .eq("id", ctx.leadId);
+
       await bookAppointment({
         leadId: ctx.leadId,
-        leadNome: ctx.leadNome,
+        leadNome: nome_completo!,
         leadTelefone: ctx.leadTelefone,
         date,
         time,
       });
-      return `Avaliação agendada com sucesso para ${date} às ${time}.`;
+      return `Avaliação agendada com sucesso para ${date} às ${time}, em nome de ${nome_completo}.`;
     }
 
     case "reschedule_appointment": {

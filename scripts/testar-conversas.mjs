@@ -237,6 +237,26 @@ const CENARIOS = [
     aoFinal: { agendou: true, naoEscalada: true },
   },
   {
+    nome: "Apresentação: diz o nome e pergunta o procedimento",
+    origem: "cliente pediu que ela se apresente como Talilia",
+    turnos: [{ diz: "oi", contem: ["talilia"], casa: ["procedimento|interesse"] }],
+  },
+  {
+    nome: "Pede nome completo, nascimento e e-mail antes de agendar",
+    origem: "clínica precisa desses dados para abrir ficha",
+    turnos: [
+      { diz: "oi, quero marcar" },
+      { diz: "limpeza" },
+      { diz: "primeira vez" },
+      {
+        diz: "pode ser o primeiro horário",
+        casa: ["nome completo"],
+        contem: ["nascimento", "mail"],
+      },
+    ],
+    aoFinal: { naoEscalada: true },
+  },
+  {
     nome: "Conversa longa saudável não é desligada",
     origem: "guarda-corpo escalou conversa de cliente com 31 msgs de 2 dias somadas",
     turnos: [
