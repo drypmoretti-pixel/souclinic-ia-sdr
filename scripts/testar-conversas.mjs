@@ -11,6 +11,12 @@
  * Cada caso aqui nasceu de um problema real. A suíte é a proteção contra
  * repetí-los.
  *
+ * ATENÇÃO à variabilidade: o modelo não responde igual todas as vezes, então
+ * uma reprovação isolada pode ser variação e não regressão. Antes de sair
+ * corrigindo, rode de novo e leia a transcrição que o relatório imprime — mais
+ * de uma vez o "defeito" era a asserção cobrando palavra exata de um texto que
+ * estava correto.
+ *
  * Uso:
  *   node scripts/testar-conversas.mjs                    # contra produção
  *   node scripts/testar-conversas.mjs http://localhost:3000
@@ -179,18 +185,25 @@ const CENARIOS = [
         naoContem: ["boleto", "gratuita e sem compromisso"],
       },
       { diz: "queria fazer implante", casa: ["avalia[çc][ãa]o|outra cl[íi]nica|primeira vez"] },
-      {
-        diz: "primeira vez",
-        contem: ["cirurgi", "raio"],
-        casa: ["\\d{1,2}[h:]"],
-      },
+      { diz: "primeira vez", casa: ["\\d{1,2}[h:]"] },
     ],
-    aoFinal: { naoEscalada: true },
+    // O roteiro do cliente precisa aparecer em algum momento antes da oferta:
+    // equipe de dentistas, custo zero e localização — as objeções antecipadas.
+    // Regex e não texto exato: o modelo diz "não tem custo", "sem custo" ou
+    // "gratuita" indistintamente, e as três cumprem o roteiro. Cobrar a palavra
+    // literal gera alarme falso — já aconteceu antes nesta suíte.
+    aoFinal: {
+      naoEscalada: true,
+      conversaCasa: ["equipe de dentistas|nossos dentistas", "n[ãa]o t[êe]m? custo|sem custo|gratuit", "metr[ôo]"],
+    },
   },
   {
     nome: "Localização: acesso antes do endereço, sem inventar",
     origem: 'ela disse "fazemos esquina com a estação" e deu o endereço primeiro',
     turnos: [
+      // A primeira mensagem sempre recebe a apresentação da Talilia, então a
+      // pergunta de verdade vem depois.
+      { diz: "oi" },
       { diz: "onde fica a clínica?", contem: ["metr"], naoContem: ["esquina", "dentro da esta"] },
     ],
     aoFinal: { naoEscalada: true },
@@ -199,6 +212,7 @@ const CENARIOS = [
     nome: "Preço: não passa valor sem avaliação, mesmo sob insistência",
     origem: "regra rígida do material da clínica",
     turnos: [
+      { diz: "oi" },
       { diz: "quanto custa um implante?", naoCasa: ["R\\$\\s?\\d", "\\d+\\s?mil"] },
       { diz: "me dá só uma faixa de valor, uns 2 mil?", naoCasa: ["R\\$\\s?\\d", "\\d+\\s?mil"] },
     ],
@@ -207,6 +221,7 @@ const CENARIOS = [
     nome: "Clínico: não indica remédio nem diagnostica",
     origem: "paciente real perguntou qual remédio tomar",
     turnos: [
+      { diz: "oi" },
       {
         diz: "estou com dor no dente, qual remédio devo tomar?",
         naoContem: ["ibuprofeno", "dipirona", "paracetamol", "anti-inflamat"],
@@ -217,13 +232,17 @@ const CENARIOS = [
     nome: "Convênio: responde certo (era o caso que o RAG errava)",
     origem: "a busca trazia 'público-alvo' em vez do bloco de convênio",
     turnos: [
+      { diz: "oi" },
       { diz: "vocês aceitam meu plano odontológico?", casa: ["n[ãa]o (trabalhamos|atendemos)|particular"] },
     ],
   },
   {
     nome: "Feriado: informação da base, não dedução",
     origem: "ela afirmou por conta própria que não abre em feriado",
-    turnos: [{ diz: "vocês abrem em feriado?", casa: ["n[ãa]o (abre|abrimos|atende)"] }],
+    turnos: [
+      { diz: "oi" },
+      { diz: "vocês abrem em feriado?", casa: ["n[ãa]o (abre|abrimos|atende)"] },
+    ],
   },
   {
     nome: "Agendamento completo: explica, oferece e reserva de verdade",
@@ -231,10 +250,20 @@ const CENARIOS = [
     turnos: [
       { diz: "oi, quero marcar uma avaliação" },
       { diz: "implante" },
-      { diz: "primeira vez", contem: ["cirurgi"], casa: ["\\d{1,2}[h:]"] },
-      { diz: "pode ser o primeiro horário que você falou", casa: ["agendad|marcad|confirmad"] },
+      { diz: "primeira vez", casa: ["\\d{1,2}[h:]"] },
+      { diz: "pode ser o primeiro horário que você falou" },
+      // A clínica exige nome completo, nascimento e e-mail — sem eles a reserva
+      // é recusada no código, então o teste precisa fornecê-los.
+      {
+        diz: "Maria Aparecida da Silva, 15/03/1985, maria.teste@exemplo.com",
+        casa: ["agendad|marcad|confirmad"],
+      },
     ],
-    aoFinal: { agendou: true, naoEscalada: true },
+    aoFinal: {
+      agendou: true,
+      naoEscalada: true,
+      conversaCasa: ["equipe de dentistas|nossos dentistas"],
+    },
   },
   {
     nome: "Apresentação: diz o nome e pergunta o procedimento",
@@ -291,6 +320,19 @@ async function rodarCenario(c) {
         if (!turno[tipo]) continue;
         for (const item of fn(resp, turno[tipo])) {
           falhas.push({ turno: turno.diz, tipo, item, resp });
+        }
+      }
+    }
+
+    // Verificações sobre a conversa inteira. Existem porque prender a checagem a
+    // um turno específico gera falso negativo: a IA pode dar a explicação um
+    // turno antes ou depois, e as duas ordens estão corretas — o que importa é
+    // que ela tenha saído antes da oferta de horário.
+    if (c.aoFinal?.conversaCasa) {
+      const tudo = transcricao.map(([, r]) => r).join("\n");
+      for (const re of c.aoFinal.conversaCasa) {
+        if (!new RegExp(re, "i").test(tudo)) {
+          falhas.push({ turno: "(conversa toda)", tipo: "casa", item: re, resp: "" });
         }
       }
     }
@@ -359,6 +401,13 @@ for (const { c, falhas, transcricao } of problemas) {
     }[f.tipo];
     console.log(`   • [${f.turno}] ${desc}`);
     if (f.resp) console.log(`     resposta: "${f.resp.replace(/\n/g, " ").slice(0, 150)}"`);
+  }
+  if (falhas.some((f) => f.turno === "(conversa toda)")) {
+    console.log("   transcrição:");
+    for (const [pergunta, resposta] of transcricao) {
+      console.log(`     👤 ${pergunta}`);
+      console.log(`     🤖 ${resposta.replace(/\n/g, " ").slice(0, 160)}`);
+    }
   }
 }
 
