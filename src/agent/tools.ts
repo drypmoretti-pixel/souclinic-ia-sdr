@@ -13,6 +13,16 @@ import type { MessagingProvider } from "../messaging/MessagingProvider.js";
  * afirmava o dia errado pro lead. Os horários vêm separados por período porque
  * o pedido mais comum é "de manhã" / "à tarde".
  */
+/** Qual turno priorizar, segundo a hora em que a conversa está acontecendo. */
+function orientacaoDeTurno(): string {
+  const horaAgora = Number(
+    new Intl.DateTimeFormat("pt-BR", { timeZone: TIMEZONE, hour: "2-digit", hour12: false }).format(new Date()),
+  );
+  return horaAgora < 12
+    ? "É MANHÃ agora: ofereça HOJE se houver vaga; não havendo, o próximo turno livre.\n"
+    : "É TARDE agora: o realista é AMANHÃ, de manhã ou à tarde. Só ofereça hoje se ainda sobrar vaga com folga.\n";
+}
+
 function formatarDias(dias: [string, string[]][]): string {
   // "hoje" e "amanhã" marcados de forma explícita: o cliente quer que a oferta
   // priorize as próximas 48h, e o modelo escolhe melhor com o rótulo do que
@@ -25,6 +35,7 @@ function formatarDias(dias: [string, string[]][]): string {
       .join("-");
   const hoje = iso(new Date());
   const amanha = iso(new Date(Date.now() + 24 * 60 * 60 * 1000));
+
 
   return dias
     .map(([data, horarios]) => {
@@ -54,9 +65,10 @@ async function explicacaoJaFoiDada(conversationId: string): Promise<boolean> {
     .order("created_at", { ascending: false })
     .limit(20);
 
-  // "cirurgiã-dentista" e "raio-X" só aparecem na explicação da avaliação, então
-  // servem de marcador barato e confiável de que ela já foi dada.
-  return (data ?? []).some((m) => /cirurgi|raio-?x/i.test(m.content));
+  // Termos que só aparecem na explicação da avaliação — marcador barato de que
+  // ela já foi dada. "cirurgi" e "raio-x" cobrem conversas que começaram com o
+  // roteiro anterior.
+  return (data ?? []).some((m) => /equipe de dentistas|n[ãa]o tem custo|cirurgi|raio-?x/i.test(m.content));
 }
 
 
@@ -223,15 +235,15 @@ export async function executeTool(
 
       if (dias.length === 0) return "Não há horários disponíveis nos próximos 14 dias.";
 
-      const horarios = formatarDias(dias);
+      const horarios = orientacaoDeTurno() + formatarDias(dias);
       if (await explicacaoJaFoiDada(ctx.conversationId)) return horarios;
 
       return (
         "PARE. Você ainda não explicou como funciona a avaliação nesta conversa, e NÃO PODE " +
         "oferecer horário antes disso.\n\n" +
         "Envie PRIMEIRO esta explicação (pode adaptar as palavras, mas mantenha tudo: a " +
-        "cirurgiã-dentista, o custo zero, a análise completa, o raio-X na unidade e a indicação " +
-        "na hora):\n\n" +
+        "equipe de dentistas, a análise completa, o plano de tratamento, o custo zero e o fácil " +
+        "acesso em frente ao metrô):\n\n" +
         `"${EXPLICACAO_AVALIACAO}"\n\n` +
         "DEPOIS dela, na mesma resposta, ofereça duas destas opções:\n" +
         horarios

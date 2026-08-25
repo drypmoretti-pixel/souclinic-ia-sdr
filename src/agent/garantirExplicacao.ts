@@ -16,8 +16,8 @@ import { supabase } from "../db/supabase.js";
 
 /** Texto definido pelo cliente. */
 export const EXPLICACAO_AVALIACAO =
-  "Para isso, você precisa passar por uma avaliação completa aqui em nossa clínica, onde nosso " +
-  "cirurgião dentista examina sua situação, faz uma análise completa e elabora o plano de tratamento.\n\n" +
+  "Para isso, você precisa passar por uma avaliação completa aqui em nossa clínica, onde nossa " +
+  "equipe de dentistas examina sua situação, faz uma análise completa e elabora o plano de tratamento.\n\n" +
   "E essa avaliação, diagnóstico e plano de tratamento não tem custo, fora que a gente fica muito bem " +
   "localizado, sendo de fácil acesso (em frente a estação de metrô de Águas Claras).";
 

@@ -75,7 +75,7 @@ export const CLINIC_KNOWLEDGE: KnowledgeChunk[] = [
       "Não tenho dinheiro pra primeira consulta",
     ],
     content:
-      "A avaliação é com a cirurgiã-dentista e não tem custo. É feita uma análise completa e, se necessário, " +
+      "A avaliação é com a equipe de dentistas da clínica e não tem custo. É feita uma análise completa e, se necessário, " +
       "o raio-X pode ser realizado na própria unidade. Na mesma consulta o paciente recebe a indicação da melhor " +
       "solução e o planejamento do tratamento começa ali. O paciente só passa a pagar se decidir iniciar o tratamento.",
   },

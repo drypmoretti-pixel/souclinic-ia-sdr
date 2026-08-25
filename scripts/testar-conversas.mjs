@@ -248,8 +248,11 @@ const CENARIOS = [
       { diz: "oi, quero marcar" },
       { diz: "limpeza" },
       { diz: "primeira vez" },
+      // Dois turnos: escolher e confirmar. "pode ser o primeiro" é ambíguo o
+      // bastante para ela pedir confirmação antes, o que é comportamento certo.
+      { diz: "pode ser o primeiro horário que você falou" },
       {
-        diz: "pode ser o primeiro horário",
+        diz: "isso mesmo, pode marcar",
         casa: ["nome completo"],
         contem: ["nascimento", "mail"],
       },

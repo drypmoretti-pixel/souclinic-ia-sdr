@@ -9,25 +9,50 @@ import { config } from "../config.js";
 
 const openai = new OpenAI({ apiKey: config.openai.apiKey });
 
-/** Baixa a mídia pela Evolution API e devolve base64 + mimetype. */
-async function baixarMidia(messageId: string): Promise<{ base64: string; mimetype: string } | null> {
+/**
+ * Baixa a mídia pela Evolution API.
+ *
+ * Tenta dois formatos de corpo porque versões diferentes da Evolution esperam
+ * coisas diferentes: umas querem só a chave da mensagem, outras o objeto inteiro
+ * que veio no webhook. Errar o formato devolve 400 e o áudio do paciente se
+ * perde, então é mais barato tentar os dois do que depender da versão instalada.
+ */
+async function baixarMidia(
+  messageId: string,
+  mensagemCompleta?: unknown,
+): Promise<{ base64: string; mimetype: string } | null> {
   const { apiUrl, apiKey, instance } = config.evolution;
-  try {
-    const res = await fetch(`${apiUrl}/chat/getBase64FromMediaMessage/${instance}`, {
-      method: "POST",
-      headers: { apikey: apiKey, "Content-Type": "application/json" },
-      body: JSON.stringify({ message: { key: { id: messageId } }, convertToMp4: false }),
-    });
-    if (!res.ok) {
-      console.error(`[midia] download falhou: ${res.status} ${(await res.text()).slice(0, 200)}`);
-      return null;
-    }
-    const j = (await res.json()) as { base64?: string; mimetype?: string };
-    return j.base64 ? { base64: j.base64, mimetype: j.mimetype ?? "application/octet-stream" } : null;
-  } catch (err) {
-    console.error(`[midia] erro ao baixar: ${(err as Error).message}`);
-    return null;
+
+  const tentativas: { nome: string; corpo: unknown }[] = [
+    { nome: "key", corpo: { message: { key: { id: messageId } }, convertToMp4: false } },
+  ];
+  if (mensagemCompleta) {
+    tentativas.push({ nome: "mensagem completa", corpo: { message: mensagemCompleta, convertToMp4: false } });
   }
+
+  for (const t of tentativas) {
+    try {
+      const res = await fetch(`${apiUrl}/chat/getBase64FromMediaMessage/${instance}`, {
+        method: "POST",
+        headers: { apikey: apiKey, "Content-Type": "application/json" },
+        body: JSON.stringify(t.corpo),
+      });
+      const texto = await res.text();
+      if (!res.ok) {
+        console.error(`[midia] download (${t.nome}) falhou: ${res.status} ${texto.slice(0, 250)}`);
+        continue;
+      }
+      const j = JSON.parse(texto) as { base64?: string; mimetype?: string };
+      if (j.base64) {
+        console.log(`[midia] download OK pelo formato "${t.nome}" (${j.mimetype ?? "?"})`);
+        return { base64: j.base64, mimetype: j.mimetype ?? "application/octet-stream" };
+      }
+      console.error(`[midia] download (${t.nome}) veio sem base64: ${texto.slice(0, 200)}`);
+    } catch (err) {
+      console.error(`[midia] erro ao baixar (${t.nome}): ${(err as Error).message}`);
+    }
+  }
+  return null;
 }
 
 /** Transcreve áudio com Whisper. Devolve null se não der. */
@@ -112,21 +137,41 @@ export async function extrairConteudo(message: any): Promise<ConteudoRecebido | 
   if (!id) return null;
 
   if (m.audioMessage) {
-    const midia = await baixarMidia(id);
-    if (!midia) return null;
-    const transcricao = await transcrever(midia.base64, midia.mimetype);
-    return transcricao ? { texto: transcricao, origem: "audio" } : null;
+    const midia = await baixarMidia(id, message);
+    const transcricao = midia ? await transcrever(midia.base64, midia.mimetype) : null;
+    if (transcricao) return { texto: transcricao, origem: "audio" };
+
+    // Falhou o download ou a transcrição. O que NÃO pode acontecer é o paciente
+    // mandar um áudio e não receber nada — foi o que o cliente relatou, e do
+    // lado dele parece que a clínica ignorou. Melhor assumir a limitação e pedir
+    // por escrito do que ficar mudo.
+    console.error(`[midia] áudio de ${message?.key?.remoteJid} não pôde ser processado`);
+    return {
+      texto:
+        "[o paciente enviou um ÁUDIO que você não conseguiu ouvir] Peça desculpas rapidamente, " +
+        "diga que não conseguiu ouvir o áudio e peça para ele escrever. Seja breve e natural.",
+      origem: "audio",
+    };
   }
 
   if (m.imageMessage) {
-    const midia = await baixarMidia(id);
-    if (!midia) return null;
-    const desc = await descreverImagem(midia.base64, midia.mimetype, m.imageMessage.caption);
-    // A legenda sozinha já vale como mensagem se a leitura da imagem falhar.
+    const legenda = m.imageMessage.caption?.trim();
+    const midia = await baixarMidia(id, message);
+    const desc = midia ? await descreverImagem(midia.base64, midia.mimetype, legenda) : null;
     if (desc) return { texto: `[o paciente enviou uma imagem] ${desc}`, origem: "imagem" };
-    return m.imageMessage.caption?.trim()
-      ? { texto: m.imageMessage.caption.trim(), origem: "imagem" }
-      : null;
+
+    // Sem conseguir ver a imagem, a legenda ainda é uma mensagem legítima.
+    if (legenda) return { texto: legenda, origem: "imagem" };
+
+    // E sem legenda, mesmo assim se responde: silêncio depois de uma foto parece
+    // descaso, e quem manda foto de dente costuma estar pronto pra agendar.
+    console.error(`[midia] imagem de ${message?.key?.remoteJid} não pôde ser processada`);
+    return {
+      texto:
+        "[o paciente enviou uma FOTO que você não conseguiu abrir] Agradeça o envio, diga que por " +
+        "foto não dá pra avaliar direito e que na avaliação o dentista examina tudo, e ofereça um horário.",
+      origem: "imagem",
+    };
   }
 
   if (m.documentMessage || m.documentWithCaptionMessage) {
