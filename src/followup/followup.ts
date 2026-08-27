@@ -85,6 +85,12 @@ async function buscarCandidatas(): Promise<Candidata[]> {
   return candidatas;
 }
 
+/** Marca a tentativa como consumida, para a conversa não voltar na fila. */
+async function contabilizar(conversationId: string): Promise<void> {
+  const { error } = await supabase.rpc("incrementar_followup", { conversa_id: conversationId });
+  if (error) console.error(`[followup] FALHA AO CONTABILIZAR ${conversationId}: ${error.message}`);
+}
+
 async function enviarFollowUp(messaging: MessagingProvider, c: Candidata): Promise<void> {
   const texto = await gerarFollowUp({
     leadId: c.leadId,
@@ -94,15 +100,34 @@ async function enviarFollowUp(messaging: MessagingProvider, c: Candidata): Promi
   });
   if (!texto) return;
 
-  await enviarHumanizado(messaging, c.leadTelefone, texto);
+  try {
+    await enviarHumanizado(messaging, c.leadTelefone, texto);
+  } catch (err) {
+    const erro = (err as Error).message;
 
-  const { error } = await supabase.rpc("incrementar_followup", { conversa_id: c.conversationId });
-  if (error) {
-    // Sem o incremento a conversa seria cutucada de novo na próxima rodada, o
-    // que é justamente o que não pode acontecer — então isso é erro, não aviso.
-    console.error(`[followup] FALHA AO CONTABILIZAR ${c.conversationId}: ${error.message}`);
+    // Número que não existe no WhatsApp nunca vai receber. Sem contabilizar
+    // aqui, a conversa volta na fila a cada varredura e o follow-up se repete
+    // indefinidamente — aconteceu: um lead com telefone inválido recebeu 11
+    // tentativas em 3 dias, cada uma gastando uma chamada ao modelo, e o
+    // contador ficou em zero o tempo todo porque a exceção pulava o incremento.
+    if (/"exists"\s*:\s*false/.test(erro)) {
+      await contabilizar(c.conversationId);
+      console.warn(
+        `[followup] ${c.leadTelefone} não existe no WhatsApp — desistindo. ` +
+          `Confira o telefone de ${c.leadNome || "(sem nome)"}.`,
+      );
+      return;
+    }
+
+    // Falha temporária (rede, Evolution fora do ar): também contabiliza, senão
+    // uma indisponibilidade de horas vira uma enxurrada de tentativas. Perder um
+    // follow-up é menos grave do que insistir com o paciente.
+    await contabilizar(c.conversationId);
+    console.error(`[followup] falha ao enviar para ${c.leadTelefone}, tentativa consumida: ${erro}`);
+    return;
   }
 
+  await contabilizar(c.conversationId);
   console.log(`[followup] enviado para ${c.leadNome || c.leadTelefone}`);
 }
 
