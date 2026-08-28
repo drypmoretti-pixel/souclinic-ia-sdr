@@ -41,8 +41,10 @@ const CONVITE = [
   /posso (agendar|reservar|marcar|confirmar|te colocar)/i,
   /qual (desses )?(hor[áa]rio|fica melhor|prefere)/i,
   /que tal/i,
-  /tenho (dispon[íi]vel|livre|um hor[áa]rio)/i,
-  /temos? (um )?hor[áa]rio/i,
+  /te(nho|mos) (agenda|hor[áa]rio|dispon[íi]vel|livre)/i,
+  /agenda dispon[íi]vel/i,
+  /hor[áa]rios? dispon[íi]ve/i,
+  /quando fica(ria)? (bom|melhor)/i,
   /fica melhor (pra|para) voc[êe]/i,
 ];
 

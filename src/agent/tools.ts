@@ -68,7 +68,9 @@ async function explicacaoJaFoiDada(conversationId: string): Promise<boolean> {
   // Termos que só aparecem na explicação da avaliação — marcador barato de que
   // ela já foi dada. "cirurgi" e "raio-x" cobrem conversas que começaram com o
   // roteiro anterior.
-  return (data ?? []).some((m) => /equipe de dentistas|n[ãa]o tem custo|cirurgi|raio-?x/i.test(m.content));
+  return (data ?? []).some((m) =>
+    /equipe de dentistas|n[ãa]o t[êe]m? custo|sem custo|cirurgi|raio-?x/i.test(m.content),
+  );
 }
 
 
