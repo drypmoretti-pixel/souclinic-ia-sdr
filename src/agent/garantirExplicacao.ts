@@ -26,7 +26,8 @@ export const EXPLICACAO_AVALIACAO =
  * só aparecem nela; "raio-x" fica do texto anterior, para conversas em andamento
  * quando a mudança subiu.
  */
-const MARCADOR = /cirurgi|n[ãa]o tem custo|sem custo|raio-?\s?x/i;
+const MARCADOR =
+  /equipe de dentistas|nossos dentistas|n[ãa]o t[êe]m? custo|sem custo|cirurgi|raio-?\s?x/i;
 
 /**
  * A resposta está OFERECENDO um horário — não apenas citando horas.

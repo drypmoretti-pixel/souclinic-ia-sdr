@@ -194,6 +194,7 @@ const CENARIOS = [
     // literal gera alarme falso — já aconteceu antes nesta suíte.
     aoFinal: {
       naoEscalada: true,
+      semRepeticaoInterna: true,
       conversaCasa: ["equipe de dentistas|nossos dentistas", "n[ãa]o t[êe]m? custo|sem custo|gratuit", "metr[ôo]"],
     },
   },
@@ -328,6 +329,23 @@ async function rodarCenario(c) {
     // um turno específico gera falso negativo: a IA pode dar a explicação um
     // turno antes ou depois, e as duas ordens estão corretas — o que importa é
     // que ela tenha saído antes da oferta de horário.
+    // Nenhuma resposta pode repetir a explicação dentro de si mesma. A trava que
+    // garante a explicação já a inseriu por cima de uma que a IA tinha escrito,
+    // e o paciente recebeu o mesmo parágrafo duas vezes.
+    if (c.aoFinal?.semRepeticaoInterna) {
+      for (const [pergunta, resposta] of transcricao) {
+        const ocorrencias = (resposta.match(/precisa passar por uma avalia[çc][ãa]o/gi) ?? []).length;
+        if (ocorrencias > 1) {
+          falhas.push({
+            turno: pergunta,
+            tipo: "duplicado",
+            item: `a explicação da avaliação aparece ${ocorrencias}x na mesma resposta`,
+            resp: resposta,
+          });
+        }
+      }
+    }
+
     if (c.aoFinal?.conversaCasa) {
       const tudo = transcricao.map(([, r]) => r).join("\n");
       for (const re of c.aoFinal.conversaCasa) {
@@ -396,6 +414,7 @@ for (const { c, falhas, transcricao } of problemas) {
       casa: `resposta não bate com /${f.item}/`,
       naoCasa: `resposta bate com /${f.item}/ e não devia`,
       escalou: `conversa foi escalada: ${f.item}`,
+      duplicado: f.item,
       "nao agendou": f.item,
       exceção: f.item,
     }[f.tipo];
