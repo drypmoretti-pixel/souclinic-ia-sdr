@@ -235,7 +235,17 @@ export async function executeTool(
         dias = dias.slice(0, 7);
       }
 
-      if (dias.length === 0) return "Não há horários disponíveis nos próximos 14 dias.";
+      if (dias.length === 0) {
+        // Sem vaga publicada. Instrução explícita para NÃO escalar: escalar trava
+        // a conversa, e aí nem publicar vagas depois faz a IA voltar a atender —
+        // o paciente fica preso esperando alguém que talvez não venha. A falta de
+        // horário é temporária e não é motivo para tirar o atendimento do ar.
+        return (
+          "Não há horário publicado na agenda no momento. NÃO use escalate_to_human por causa " +
+          "disso. Diga ao paciente que você vai verificar a agenda com a equipe e retorna em " +
+          "seguida com os horários, e siga conversando normalmente se ele perguntar outras coisas."
+        );
+      }
 
       const horarios = orientacaoDeTurno() + formatarDias(dias);
       if (await explicacaoJaFoiDada(ctx.conversationId)) return horarios;
