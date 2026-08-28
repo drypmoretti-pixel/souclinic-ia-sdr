@@ -1,11 +1,15 @@
 import { supabase } from "./supabase.js";
 
 /**
- * Silêncio a partir do qual a próxima mensagem inicia uma conversa nova, em
- * vez de continuar a anterior. 12h separa bem "voltou depois de pensar" de
- * "voltou semana que vem por outro motivo".
+ * Silêncio a partir do qual a próxima mensagem inicia uma conversa nova, em vez
+ * de continuar a anterior.
+ *
+ * Começou em 12h e desceu para 4h depois de um caso real: o paciente voltou
+ * 6h45 depois, caiu na conversa antiga e a IA respondeu à dor de dente que ele
+ * tinha mencionado de manhã. Atendimento de clínica por WhatsApp se resolve em
+ * minutos; quem some por 4h e volta está começando de novo.
  */
-const HORAS_ATE_NOVA_CONVERSA = Number(process.env.HORAS_NOVA_CONVERSA ?? 12);
+const HORAS_ATE_NOVA_CONVERSA = Number(process.env.HORAS_NOVA_CONVERSA ?? 4);
 
 export interface LeadConversation {
   leadId: string;

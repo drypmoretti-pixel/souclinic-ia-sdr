@@ -11,6 +11,8 @@ const client = new OpenAI({ apiKey: config.openai.apiKey });
 
 const MODEL = "gpt-4o";
 const HISTORY_LIMIT = 20;
+/** Janela do histórico. Mensagem mais velha que isso não entra no contexto. */
+const HISTORY_HOURS = Number(process.env.HISTORICO_HORAS ?? 4);
 
 export interface AgentTurnContext {
   leadId: string;
@@ -19,11 +21,26 @@ export interface AgentTurnContext {
   conversationId: string;
 }
 
+/**
+ * Histórico recente da conversa.
+ *
+ * Limitado por TEMPO, além da quantidade. Sem o corte temporal, a IA reagia a
+ * assuntos encerrados horas ou dias antes: um paciente que de manhã perguntou
+ * "estou com dor, que remédio tomo?" mandou "Ola" à tarde e recebeu "entendo
+ * que você está com dor, vou chamar alguém da equipe" — respondendo a uma
+ * mensagem que não existia mais na cabeça dele.
+ *
+ * A janela é curta de propósito: conversa de WhatsApp com clínica se resolve em
+ * minutos, e contexto velho atrapalha mais do que ajuda.
+ */
 async function loadHistory(conversationId: string): Promise<ChatCompletionMessageParam[]> {
+  const desde = new Date(Date.now() - HISTORY_HOURS * 60 * 60 * 1000).toISOString();
+
   const { data, error } = await supabase
     .from("messages")
     .select("direction, content")
     .eq("conversation_id", conversationId)
+    .gte("created_at", desde)
     .order("created_at", { ascending: true })
     .limit(HISTORY_LIMIT);
   if (error) throw error;
