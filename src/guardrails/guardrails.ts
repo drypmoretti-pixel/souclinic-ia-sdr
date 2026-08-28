@@ -158,10 +158,6 @@ export async function avaliarConversa(
   return OK;
 }
 
-/** O que o paciente ouve quando o guarda-corpo dispara. */
-export function mensagemDeTransicao(): string {
-  return (
-    "Deixa eu chamar alguém da equipe pra te ajudar melhor com isso 😊\n\n" +
-    "Já já te respondem por aqui."
-  );
-}
+// A mensagem de transição saiu junto com a mudança: o guarda-corpo não
+// interrompe mais o atendimento, só avisa a secretária. Quem se despede do
+// paciente é a própria IA, quando ela decide escalar de verdade.

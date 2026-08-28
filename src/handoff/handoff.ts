@@ -35,6 +35,17 @@ export interface DadosHandoff {
   leadNome: string;
   leadTelefone: string;
   motivo: string;
+  /**
+   * `true` tira a conversa do automático: a IA para de responder até alguém
+   * destravar. Reservado para o que realmente exige gente — pedido explícito de
+   * falar com uma pessoa, dor/emergência, reclamação.
+   *
+   * `false` só avisa a secretária e a IA continua atendendo. É o certo para
+   * sinais de qualidade (guarda-corpo): eles indicam que a conversa PODE estar
+   * indo mal, e travar o atendimento por suspeita já custou paciente esperando
+   * dias por alguém que não veio.
+   */
+  travar?: boolean;
 }
 
 /**
@@ -46,19 +57,22 @@ export async function passarParaHumano(
   messaging: MessagingProvider,
   dados: DadosHandoff,
 ): Promise<void> {
-  const { conversationId, leadId, leadNome, leadTelefone, motivo } = dados;
+  const { conversationId, leadId, leadNome, leadTelefone, motivo, travar = true } = dados;
 
-  // 1. Trava a IA nessa conversa. É o passo que não pode falhar — por isso vem
-  // primeiro e é o único que propaga erro.
-  const { error } = await supabase
-    .from("conversations")
-    .update({ status: "com_humano", handoff_at: new Date().toISOString(), handoff_motivo: motivo })
-    .eq("id", conversationId);
-  if (error) throw error;
+  if (travar) {
+    const { error } = await supabase
+      .from("conversations")
+      .update({ status: "com_humano", handoff_at: new Date().toISOString(), handoff_motivo: motivo })
+      .eq("id", conversationId);
+    if (error) throw error;
 
-  await supabase.from("leads").update({ status_lead: "precisa_humano" }).eq("id", leadId);
-
-  console.log(`[handoff] ${leadNome || leadTelefone} passou para humano — ${motivo}`);
+    await supabase.from("leads").update({ status_lead: "precisa_humano" }).eq("id", leadId);
+    console.log(`[handoff] ${leadNome || leadTelefone} passou para humano — ${motivo}`);
+  } else {
+    // Só registra o motivo, sem tirar do automático.
+    await supabase.from("conversations").update({ handoff_motivo: motivo }).eq("id", conversationId);
+    console.warn(`[alerta] ${leadNome || leadTelefone} — ${motivo} (IA continua atendendo)`);
+  }
 
   // 2. Avisa a secretária.
   const numero = config.handoff.secretariaWhatsapp;
@@ -76,12 +90,16 @@ export async function passarParaHumano(
 
     const resumo = await resumoDaConversa(conversationId);
     const texto =
-      `🔔 *Atendimento precisa de você* (${agora})\n\n` +
+      (travar
+        ? `🔔 *Atendimento precisa de você* (${agora})\n\n`
+        : `⚠️ *Fique de olho nesta conversa* (${agora})\n\n`) +
       `*Paciente:* ${leadNome || "sem nome"}\n` +
       `*WhatsApp:* wa.me/${leadTelefone.replace(/\D/g, "")}\n` +
       `*Motivo:* ${motivo}\n\n` +
       `*Últimas mensagens:*\n${resumo}\n\n` +
-      `_A IA parou de responder essa conversa. Fale direto com o paciente pelo link acima._`;
+      (travar
+        ? `_A IA parou de responder essa conversa. Fale direto com o paciente pelo link acima._`
+        : `_A IA continua atendendo normalmente. Entre só se achar necessário._`);
 
     await messaging.sendText(numero, texto);
   } catch (err) {
@@ -89,12 +107,37 @@ export async function passarParaHumano(
   }
 }
 
+/**
+ * Horas que uma conversa pode ficar parada com humano antes de a IA reassumir.
+ *
+ * Existe porque o handoff sem prazo virou armadilha: uma paciente ficou dias
+ * esperando alguém que nunca entrou, e cada mensagem nova dela caía no vazio.
+ * Silêncio indefinido é pior do que a IA voltar a atender — se a secretária
+ * assumiu de fato, ela já respondeu bem antes disso.
+ */
+const HORAS_ATE_IA_REASSUMIR = Number(process.env.HANDOFF_EXPIRA_HORAS ?? 3);
+
 /** A IA responde essa conversa, ou ela está nas mãos de um humano? */
 export async function conversaEstaComHumano(conversationId: string): Promise<boolean> {
   const { data } = await supabase
     .from("conversations")
-    .select("status")
+    .select("status, handoff_at")
     .eq("id", conversationId)
     .single();
-  return data?.status === "com_humano";
+
+  if (data?.status !== "com_humano") return false;
+
+  const desde = data.handoff_at ? new Date(data.handoff_at).getTime() : 0;
+  if (Date.now() - desde > HORAS_ATE_IA_REASSUMIR * 60 * 60 * 1000) {
+    await supabase
+      .from("conversations")
+      .update({ status: "ativa", handoff_at: null })
+      .eq("id", conversationId);
+    console.warn(
+      `[handoff] conversa ${conversationId} ficou ${HORAS_ATE_IA_REASSUMIR}h sem atendimento humano — ` +
+        `IA reassumiu para o paciente não ficar sem resposta.`,
+    );
+    return false;
+  }
+  return true;
 }

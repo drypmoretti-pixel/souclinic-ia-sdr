@@ -175,10 +175,11 @@ export const toolDefinitions: OpenAIToolDef[] = [
       description:
         "Passa a conversa para a secretária humana. A partir daí VOCÊ PARA de responder esse " +
         "paciente — use quando realmente não conseguir resolver, não como saída fácil. " +
-        "Use quando: você já tentou duas vezes e o paciente continua sem ser atendido; a pergunta " +
-        "exige informação que não está na sua base; é reclamação, urgência ou dor forte; ou o " +
-        "paciente pede para falar com uma pessoa. Ao chamar, avise o paciente na mesma resposta " +
-        "que alguém da equipe vai continuar o atendimento.",
+        "Use SOMENTE em três casos: dor forte/urgência/emergência, reclamação sobre atendimento " +
+        "anterior, ou pedido explícito de falar com uma pessoa. Não escale por não saber uma " +
+        "informação (diga que vai confirmar), por falta de horário na agenda, nem por insistência " +
+        "em preço ou diagnóstico. Ao chamar, avise o paciente na mesma resposta que alguém da " +
+        "equipe vai continuar o atendimento.",
       parameters: {
         type: "object",
         properties: {
@@ -241,9 +242,9 @@ export async function executeTool(
         // o paciente fica preso esperando alguém que talvez não venha. A falta de
         // horário é temporária e não é motivo para tirar o atendimento do ar.
         return (
-          "Não há horário publicado na agenda no momento. NÃO use escalate_to_human por causa " +
-          "disso. Diga ao paciente que você vai verificar a agenda com a equipe e retorna em " +
-          "seguida com os horários, e siga conversando normalmente se ele perguntar outras coisas."
+          "Não há horário disponível na agenda. Diga isso ao paciente de forma simples e direta — " +
+          "que no momento não há horário disponível — e ofereça avisá-lo assim que abrir vaga. " +
+          "NÃO use escalate_to_human por causa disso e siga atendendo normalmente."
         );
       }
 

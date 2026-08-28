@@ -12,7 +12,7 @@ import { iniciarFollowUps } from "./followup/followup.js";
 import { iniciarLembretes } from "./lembrete/lembrete.js";
 import { iniciarRevisaoDiaria } from "./revisao/revisaoDiaria.js";
 import { conversaEstaComHumano, passarParaHumano } from "./handoff/handoff.js";
-import { avaliarConversa, mensagemDeTransicao } from "./guardrails/guardrails.js";
+import { avaliarConversa } from "./guardrails/guardrails.js";
 import { registrarMensagemRecebida } from "./db/leads.js";
 import { garantirExplicacao } from "./agent/garantirExplicacao.js";
 import { adminRoutes } from "./admin/routes.js";
@@ -131,17 +131,20 @@ app.post("/webhook/whatsapp", async (request, reply) => {
       respostaTexto,
       lead.leadStatus === "agendado",
     );
+    // O guarda-corpo AVISA, mas não tira a IA do ar. Ele detecta suspeita de
+    // problema, não certeza: travar por suspeita já custou dois atendimentos
+    // saudáveis interrompidos e uma paciente esperando dias. A secretária recebe
+    // o alerta e entra se quiser; o paciente continua sendo atendido.
     if (veredito.escalar) {
-      app.log.warn(`guarda-corpo disparou para ${tel}: ${veredito.motivo}`);
+      app.log.warn(`guarda-corpo: ${tel} — ${veredito.motivo}`);
       await passarParaHumano(messaging, {
         leadId: lead.leadId,
         conversationId: lead.conversationId,
         leadNome: lead.leadNome,
         leadTelefone: lead.leadTelefone,
         motivo: veredito.motivo,
+        travar: false,
       });
-      await enviarHumanizado(messaging, tel, mensagemDeTransicao());
-      return;
     }
 
     await enviarHumanizado(messaging, tel, respostaTexto);

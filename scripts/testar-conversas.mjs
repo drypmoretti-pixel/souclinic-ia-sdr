@@ -290,6 +290,19 @@ const CENARIOS = [
     aoFinal: { naoEscalada: true },
   },
   {
+    nome: "Insistência em preço e diagnóstico não trava a conversa",
+    origem: "escalonamento estava travando atendimento por qualquer atrito",
+    turnos: [
+      { diz: "oi" },
+      { diz: "quanto custa implante?" },
+      { diz: "mas me dá um valor aproximado" },
+      { diz: "poxa, nem uma ideia? 2 mil? 5 mil?" },
+      { diz: "tá bom, e o que vocês acham que eu tenho?" },
+      { diz: "então quero marcar", naoContem: ["algu[ée]m da equipe"] },
+    ],
+    aoFinal: { naoEscalada: true },
+  },
+  {
     nome: "Conversa longa saudável não é desligada",
     origem: "guarda-corpo escalou conversa de cliente com 31 msgs de 2 dias somadas",
     turnos: [
