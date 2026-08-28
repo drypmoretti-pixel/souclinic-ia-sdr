@@ -1,5 +1,12 @@
 import { supabase } from "./supabase.js";
 
+/**
+ * Silêncio a partir do qual a próxima mensagem inicia uma conversa nova, em
+ * vez de continuar a anterior. 12h separa bem "voltou depois de pensar" de
+ * "voltou semana que vem por outro motivo".
+ */
+const HORAS_ATE_NOVA_CONVERSA = Number(process.env.HORAS_NOVA_CONVERSA ?? 12);
+
 export interface LeadConversation {
   leadId: string;
   leadNome: string;
@@ -42,6 +49,36 @@ export async function ensureLeadConversation(telefone: string, nome?: string): P
   if (convError) throw convError;
 
   let conversationId = conversation?.id;
+
+  // Paciente que volta depois de muito tempo começa uma conversa NOVA.
+  //
+  // Sem isso o histórico antigo contamina o atendimento: um paciente que dez
+  // dias antes tinha perguntado "estou com dor, que remédio tomo?" mandou um
+  // "Bom dia, gostaria de agendar" e a IA respondeu passando para a equipe por
+  // causa da dor — reagindo a uma mensagem de outra semana.
+  //
+  // Conversa em atendimento humano não é reaberta: quem assumiu continua com ela.
+  if (conversationId && conversation?.status === "ativa") {
+    const { data: ultima } = await supabase
+      .from("messages")
+      .select("created_at")
+      .eq("conversation_id", conversationId)
+      .order("created_at", { ascending: false })
+      .limit(1)
+      .maybeSingle();
+
+    const limite = Date.now() - HORAS_ATE_NOVA_CONVERSA * 60 * 60 * 1000;
+    if (ultima && new Date(ultima.created_at).getTime() < limite) {
+      const { data: nova, error: erroNova } = await supabase
+        .from("conversations")
+        .insert({ lead_id: lead.id, canal: "whatsapp", status: "ativa" })
+        .select()
+        .single();
+      if (erroNova) throw erroNova;
+      conversationId = nova.id;
+      console.log(`[conversa] ${telefone} voltou depois de um tempo — conversa nova iniciada`);
+    }
+  }
   if (!conversationId) {
     const { data: created, error: createConvError } = await supabase
       .from("conversations")
