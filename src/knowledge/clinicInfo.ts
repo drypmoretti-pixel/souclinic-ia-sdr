@@ -69,7 +69,6 @@ export const CLINIC_KNOWLEDGE: KnowledgeChunk[] = [
       "Como funciona a avaliação?",
       "Vocês fazem raio-X?",
       "Tem raio-X na clínica?",
-      "Quem faz a avaliação?",
       "A consulta de avaliação tem custo?",
       "Preciso pagar pra ser atendido na primeira vez?",
       "Não tenho dinheiro pra primeira consulta",
@@ -78,6 +77,23 @@ export const CLINIC_KNOWLEDGE: KnowledgeChunk[] = [
       "A avaliação é com a equipe de dentistas da clínica e não tem custo. É feita uma análise completa e, se necessário, " +
       "o raio-X pode ser realizado na própria unidade. Na mesma consulta o paciente recebe a indicação da melhor " +
       "solução e o planejamento do tratamento começa ali. O paciente só passa a pagar se decidir iniciar o tratamento.",
+  },
+  {
+    title: "Quem atende — Dra. Karine",
+    perguntas: [
+      "Quem é a dentista?",
+      "Qual o nome da dentista?",
+      "Quem vai me atender?",
+      "Quem faz a avaliação?",
+      "Quem é a doutora?",
+      "Qual o nome do doutor?",
+      "Quem é o dentista responsável?",
+      "Com quem vou ser atendido?",
+      "Quem é a profissional da clínica?",
+    ],
+    content:
+      "O atendimento e a avaliação são feitos pela Dra. Karine, cirurgiã-dentista da SouClinic. " +
+      "Qualquer informação além do nome dela (formação, especialidade, CRO, agenda pessoal) precisa ser confirmada com a equipe.",
   },
   {
     title: "Formas de pagamento e parcelamento",
